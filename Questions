@@ -1,1 +1,294 @@
+Interview Questions for Ansible, Docker and Python:
+
+Shell Script to list the name of files in a certain path ?
+#!/bin/sh
+for i in `ls -lar *.*`
+do
+echo $i
+done
+
+Algorithm to use in Elastic Load Balanacer ?
+
+How Autoscaling is configured and alogorithm used at the backend ?
+
+How Autoscaling is configured ?
+Create Launch Configuration -> Choose AMI, InstanceType, Configure Details, Security Groups and KeyPair => Launch it
+aws autoscaling create-launch-configuration --launch-configuration-name my-launch-config --placement-tenancy dedicated --image-id ...
+aws autoscaling describe-launch-configurations --launch-configuration-names my-launch-config
+aws autoscaling create-launch-configuration --launch-configuration-name classiclink-config --image-id ami_id --instance-type instance_type \
+--classic-link-vpc-id vpc_id --classic-link-vpc-security-groups group_id
+aws autoscaling update-auto-scaling-group --auto-scaling-group-name my-asg --launch-configuration-name classiclink-config
+
+Read the whole Auto Scaling Documentation ?
+
+Have you ever Hosted any WebApplication in AWS or Normal ? => Through Docker only
+
+Alogorithm used in Auto Scaling ?
+autoscaler_task_interval 60000;
+min_app_instances  1;
+server_startup_delay 180000;
+max_requests_per_second   5;
+rounds_to_average       2;
+alarming_upper_rate 0.7;
+alarming_lower_rate 0.2;
+scale_down_factor 0.25;
+
+Which language comes in the output of Ansible ? => JSON
+
+How DNS resolution work ?
+
+Ansible Roles Architecture ?
+
+How to handle multiple yml playbooks ? Include module
+
+How to put condition in Ansible ? When
+tasks:
+  - name: "shut down Debian flavored systems"
+    command: /sbin/shutdown -t now
+    when: ansible_os_family == "Debian"
+
+List of modules which you have worked ? Need to go in depth
+when, yum, command, become, tasks, accelerate, 
+
+How to check Docker Container is up or down ? $ docker ps -a -q
+
+List the Values in ascending order and keys in any order in Python ?
+
+Fetch the string from a list only without list comprehension ? a = [1,"one",2] => one
+
+How SNS work in AWS and how you have configured in your Project ? Read SNS AWS Article
+
+What is the maximum no of nodes which you have configured in Ansible Playbook ? 20+
+
+Ansible or Puppet which one is better and why ? Ansible because no Master and Agent concept, Pull Concept, Less time 
+
+Directory structure for Roles in Ansible ?
+site.yml
+webservers.yml
+fooservers.yml
+roles/
+   common/
+     tasks/
+     handlers/
+     files/
+     templates/
+     vars/
+     defaults/
+     meta/
+   webservers/
+     tasks/
+     defaults/
+     meta/
+
+Have you created any Docker file by your own elaborate it ? Yes, for Jenkins and MySQL
+
+Which mandatory module you have to implement in REST Python API ? 
+Import os
+pip install py-rest-client
+
+Which module you need to implement to interact the AWS Services or for AWS Automation ? boto or boto3
+
+Structure for copy module in Ansible while copying multiple files from local to remote machine ?
+- copy:
+    src: /srv/myfiles/foo.conf
+    dest: /etc/foo.conf
+    owner: foo
+    group: foo
+    mode: 0644
+
+Why and how you have implemented the Cloud Watch Monitoring ? Read AWS Cloud Watch Monitoring
+To enable all actions for an alarm => aws cloudwatch enable-alarm-actions --alarm-names myalarm
+
+Why we use handlers module in Ansible ? To restart any service
+---
+- hosts: webservers
+  vars:
+    http_port: 80
+    max_clients: 200
+  remote_user: root
+  tasks:
+  - name: ensure apache is at the latest version
+    yum: name=httpd state=latest
+  - name: write the apache config file
+    template: src=/srv/httpd.j2 dest=/etc/httpd.conf
+    notify:
+    - restart apache
+  - name: ensure apache is running (and enable it at boot)
+    service: name=httpd state=started enabled=yes
+  handlers:
+    - name: restart apache
+      service: name=httpd state=restarted
+
+What is the data type for class in Python ?
+
+Have you worked on Ansible with Docker ? No
+
+Command to install Docker in OS ? Mac => sudo easy_install docker 
+
+Pre-requisites to install Docker => Python would be must
+
+Difference between List and Tuple ?
+List is Mutable and Tuple is Immutable
+
+Where have you used list and tuple in your project ?
+Useless question
+
+How to fetch the unique elements in Python ? => set
+
+Is string is a mutable to immutable ? mutable 
+
+In Dictionary, will the data will print the way you insert ? Need to verify 
+
+Which Algorithm used at the backend of Dictionary in Python ? Hashmap Techniques
+
+How Elastic Search work and where you have used ? => Kibana and Splunk i have used 
+
+List comprehension in Python and give me the type of string ? 
+A = [ print(i) for i in range(10) ]
+Print(A)
+
+How iterator works in Python ? Iterator used to iterate the array elements
+# define a list
+my_list = [4, 7, 0, 3]
+# get an iterator using iter()
+my_iter = iter(my_list)
+## iterate through it using next() 
+#prints 4
+print(next(my_iter))
+#prints 7
+print(next(my_iter))
+## next(obj) is same as obj.__next__()
+#prints 0
+print(my_iter.__next__())
+#prints 3
+print(my_iter.__next__())
+## This will raise error, no items left
+next(my_iter)
+
+What is SLA ? 
+A service-level agreement (SLA) is a document describing the level of service expected by a customer from a supplier, laying out the metrics by which that service is ... However, it's recommended that the client and the outsourcing company work together during the SLA contract negotiation to eliminate any ...
+
+Which algorithm it worked at the backend of SLA ?
+Interleaved Polling Algorithm
+
+Have you ever created any certificate ? Yes, through openssl command
+The commands below can be used to view the certificate fingerprint/thumbprint.
+• SHA-256: openssl x509 -noout -fingerprint -sha256 -inform pem -in [certificate-file.crt] 
+• SHA-1: openssl x509 -noout -fingerprint -sha1 -inform pem -in [certificate-file.crt]
+• MD5: openssl x509 -noout -fingerprint -md5 -inform pem -in [certificate-file.crt] 
+
+What is the demerits and merits while creating a certificate by our own ?
+Advantages
+1. No PKI (Public Key Infrastructure) is needed.
+2. Automatic deployment (Usually Self-signed certificates created automatic during the installation process of the server side applications).
+Disadvantages
+1. The certificates aren’t trusted by other applications/operating systems. This may lead to authentications errors etc.
+Note: To overcome this limitation, some IT staff add the self-signed certificates to the Trusted Roots Certificate Authorities. However, using this workaround may to additional time that needed for management and troubleshooting.
+2. Self-signed certificates life time is usually 1 years. Before the year is ended, the certificate may need to renew/replace.
+3. Self-signed certificates may use low hash and cipher technologies. Due this, the security level that implemented by self-signed certificates may not satisfy the current Security Policy etc. .
+4. No support for advanced PKI (Public Key Infrastructure) functions (e.g. Online checking of the revocation list etc.).
+5. Most of the advanced feathers of the server side applications required to impended a PKI (Public Key Infrastructure). By this, self-signed certificates advantages can't be used.
+
+What is ca-certificates  and in which Algorithm it worked ?
+CA certificates can also be used to establish trust relationships between CAs in two different public key infrastructure (PKI) hierarchies.
+Root CA Certificate 
+	Issuing CA Certificate
+		User Certificate
+The following are some of the trust scenarios that can be enabled by properly configured CA certificates:
+	• Simple trust within an enterprise PKI
+	• Cross trust between two enterprise CAs (restricted)
+	• Bridge trust for multiple enterprise PKIs (unrestricted)
+	• Certificate trust continuity when the certificate policy changes
+
+Have you worked in hadoop and Are you good in SQL Queries ? No, and Yes
+
+How Ansible worked, let me know its Architecture ?
+
+
+What sequence followed by Ansible while executing the playbook ?
+INVENTORY (LIST OF ALL WEBSERVERS), PLAYBOOK (MENTION ALL INVENTORIES) -> THROUGH SSH IT CONNECTS WITH REMOTE NODES AND DO THE DEPLOYMENT
+
+Have you ever worked on Dynamic Playbook ?
+
+Have you ever worked on Dynamic Docker File ?
+
+Installation of Ansible ?
+Install packages below on server machines
+$ sudo apt-get install python-yaml python-jinja2 python-paramiko python-crypto python-keyczar ansible
+Install packages below on client machines
+$ sudo apt-get install python-crypto python-keyczar
+
+How to read the last word of a file ?
+awk 'NF {print $NF; exit}'
+OR
+# Python Code to read the first and last word of a file
+f = open("file_name.ext","r")
+for line in f:
+	words = line.split()
+	print(words[-1])
+OR
+f = open("file_name.ext","r")	# open the file in read mode only
+line = []  # create an empty list to store the lines of a file
+for i in f:
+	line.append(i)  # loop over the line in the file and store them in the list
+for i in line:
+	words_in_line=i.split()  # creates a list of the words in each line
+	print(words_in_line[0],words_in_line[-1])  # print out the first and last word of each line
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Panda: Machine Learning
+
+Three Data Structures:
+Series; Data Frame; Panel
+
+Ex_1:
+import pandas as pd
+import quandl 
+df = quandl.get('WIKI/GOOGL')
+print(df.head)
+
+Note: 
+Series: 1D (Homogeneous data; Size Immutable; Data Mutable)
+Data Frame: 2D (Heterogeneous data; Size Mutable; Data Mutable)
+Panel: 3D (Heterogeneous data; Size Mutable; Data Mutable)
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Where we implement Auto Scaling Instance Level or ELB Level ?
+Instance level
+
+What kind of Ansible Playbook you wrote ?
+
+Rename all files contents as "xyz" using Shell Scripting ?
+
+What kind of automations you have done in Python ?
+
+Difference between Git and SVN ?
+
+What it indicates when checkout happened and meanwhile a new file would created in SVN ?
+
+Why we used JSON ?
+
+What happened when /boot or /root volume shows 100% ?
+
+Can we release cache memory and how ?
+sync; echo 3 > /proc/sys/vm/drop_caches
+
+Difference between jar war and ear files in java ?
+In J2EE application, modules are packaged as EAR, JAR and WAR based on their functionality
+JAR: EJB modules which contain enterprise java beans (class files) and EJB deployment descriptor are packed as JAR files with .jar extenstion
+WAR: Web modules which contain Servlet class files, JSP Files, supporting files, GIF and HTML files are packaged as JAR file with .war (web archive) extension
+EAR: All above files (.jar and .war) are packaged as JAR file with .ear (enterprise archive) extension and deployed into Application Server.
+
+How to create a 0 downtime deploy manually using Jenkins ?
+
+Difference between .rb and .erb ?
+erb is the extension of the template engine used to interpret the file. ... erb is the file extension for eRuby documents, which is a way of embedding Ruby into a text document. Similar to how PHP works. rb is the file extension for ruby 
+
+
+
+
 
