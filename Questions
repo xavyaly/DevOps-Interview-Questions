@@ -1,5 +1,3201 @@
 Interview Questions for Ansible, Docker and Python:
 
+.
+
+__init__.py
+
+na
+
+util.py
+
+import sys
+import java
+
+from java import util
+from java.io import *
+from java.lang import *
+from java.util import *
+
+lineSeparator = java.lang.System.getProperty('line.separator')
+props = None
+
+True = 1
+False = 0
+
+def log (message, withArrows=True):
+  if withArrows:
+  	print '>>>%s' % message
+  else:
+  	print message
+  
+def debug (message):
+  print '     %s' % message
+  
+def raiseError(message):
+  raise RuntimeError, message
+  
+def formatExceptionInfo(maxTBlevel=5):
+  import sys, traceback
+  
+  cla, exc, trbk = sys.exc_info()
+  excName = cla.__name__
+  try:
+    excArgs = exc.__dict__['args']
+  except:
+    excArgs = '<no args>'
+  excTb = traceback.format_tb(trbk, maxTBlevel)
+  return '%s %s %s' % (excName, excArgs, excTb)
+    
+
+conifg/resource:
+
+__init__.py
+
+from ewad.config import BaseConfigurator
+from ewad.config.resource.async import WorkManagerConfigurator
+from ewad.config.resource.datasource import DataSourceConfigurator
+from ewad.config.resource.jca import J2CConnectionFactoryConfigurator
+from ewad.config.resource.env import ResourceEnvironmentProviderConfigurator
+from ewad.config.resource.jms import MqConnectionFactoryConfigurator, MqQueueConfigurator, MqTopicConfigurator, MQActivationSpecConfigurator
+from ewad.config.resource.url import UrlConfigurator
+from ewad.config.env import NameSpaceBindingConfigurator
+from ewad.config.resource.cache import CacheConfigurator
+
+class ResourceConfigurator(BaseConfigurator):
+  '''
+    Configurator used to configure resources from a resource owner
+  '''
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, resourceOwner):
+    dataSourceConfigurator = DataSourceConfigurator(self.adminConfig, self.adminTask)
+    for dataSource in resourceOwner.dataSources:
+      dataSourceConfigurator.configure(resourceOwner.scope, dataSource)
+      
+    j2cConnectionFactoryConfigurator = J2CConnectionFactoryConfigurator(self.adminConfig, self.adminTask)
+    for j2cConnectionFactory in resourceOwner.j2cConnectionFactories:
+      j2cConnectionFactoryConfigurator.configure(resourceOwner.scope, j2cConnectionFactory)  
+      
+    mqConnectionFactoryConfigurator = MqConnectionFactoryConfigurator(self.adminConfig, self.adminTask)
+    for mqConnectionFactory in resourceOwner.mqConnectionFactories:
+      mqConnectionFactoryConfigurator.configure(resourceOwner.scope, mqConnectionFactory)
+    
+    mqQueueConfigurator = MqQueueConfigurator(self.adminConfig, self.adminTask)
+    for mqQueue in resourceOwner.mqQueues:
+      mqQueueConfigurator.configure(resourceOwner.scope, mqQueue)
+    
+    mqTopicConfigurator = MqTopicConfigurator(self.adminConfig, self.adminTask)
+    for mqTopic in resourceOwner.mqTopics:
+      mqTopicConfigurator.configure(resourceOwner.scope, mqTopic)
+    
+    mqActivationSpecConfigurator = MQActivationSpecConfigurator(self.adminConfig, self.adminTask)
+    for mqActivationSpec in resourceOwner.mqActivationSpecs:
+      mqActivationSpecConfigurator.configure(resourceOwner.scope, mqActivationSpec)
+    
+    workManagerConfigurator = WorkManagerConfigurator(self.adminConfig, self.adminTask)
+    for workManagerInfo in resourceOwner.workManagers:
+      workManagerConfigurator.configure(resourceOwner.scope, workManagerInfo)
+    
+    urlConfigurator = UrlConfigurator(self.adminConfig, self.adminTask)
+    for url in resourceOwner.urls:
+      urlConfigurator.configure(resourceOwner.scope, url)
+    
+    nameSpaceBindingConfigurator = NameSpaceBindingConfigurator(self.adminConfig, self.adminTask)
+    for nameSpaceBinding in resourceOwner.nameSpaceBindings:
+      nameSpaceBindingConfigurator.configure(resourceOwner.scope, nameSpaceBinding)
+      
+    resourceEnvironmentConfigurator = ResourceEnvironmentProviderConfigurator(self.adminConfig, self.adminTask)
+    for resourceEnvironmentProvider in resourceOwner.resourceEnvironmentProviders:
+       resourceEnvironmentConfigurator.configure(resourceOwner.scope, resourceEnvironmentProvider)
+   
+    objectCacheInstanceConfigurator = CacheConfigurator(self.adminConfig, self.adminTask)
+    for objectCacheInstance in resourceOwner.objectCacheInstances:
+      objectCacheInstanceConfigurator.configure(resourceOwner.scope, objectCacheInstance)    
+
+async.py
+
+from ewad.util import log, debug, raiseError
+from ewad.config.finder import getConfigItemId, findConfigTargetWithScope, findScopeEntry
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, modifyConfigObject
+
+class WorkManagerConfigurator(BaseConfigurator):    
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, workManagerInfo):
+    log('Configuring WorkManagerInfo: ( %s, %s )' % (workManagerInfo.name, workManagerInfo.jndiName))
+  
+    workManagerProvider = self.getWorkManagerProvider(scope, 'WorkManagerProvider')
+  
+    attributes = [['name', workManagerInfo.name],
+                  ['jndiName', workManagerInfo.jndiName],
+                  ['description', workManagerInfo.description],
+                  ['minThreads', workManagerInfo.minThreads],
+                  ['maxThreads', workManagerInfo.maxThreads],
+                  ['threadPriority', workManagerInfo.threadPriority],
+                  ['numAlarmThreads', workManagerInfo.numAlarmThreads],
+                  ['isGrowable', workManagerInfo.isGrowable],
+                  ['workReqQFullAction', workManagerInfo.workReqQFullAction],
+                  ['serviceNames', workManagerInfo.serviceNames]]
+  
+    workManagerInfoConfig = findConfigTargetWithScope(self.adminConfig, scope, workManagerInfo.name, 'WorkManagerInfo')
+    if workManagerInfoConfig:
+      debug('WorkManagerInfo exists, updating')
+      modifyConfigObject(self.adminConfig, 'WorkManagerInfo', workManagerInfoConfig, attributes)
+    else:  
+      debug('WorkManagerInfo does not exists, creating')
+      createConfigObject(self.adminConfig, 'WorkManagerInfo', workManagerProvider, attributes)
+
+  def getWorkManagerProvider (self, scope, providerName):
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+    
+    provider = getConfigItemId(self.adminConfig, scope, 'WorkManagerProvider', providerName)
+    if provider:
+      debug('Provider %s exists on scope %s' % (providerName, scope))
+    else:
+      raiseError('Provider %s does not exist on scope %s' % (providerName, scope))
+
+    return provider
+
+cache.py
+
+from ewad.util import log, debug, raiseError, True, False
+from ewad.config.finder import findConfigTargetWithScope, findJ2CResourceAdapterWithScope, findScopeEntry, getConfigItemId, getConfigObjectScoped, getAttribute, getConfigId
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, createConfigObjectWithParentName, modifyConfigObject, removeConfigObject, wsadminToList
+
+class CacheConfigurator(BaseConfigurator):    
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, objectCache):
+    log('Configuring Object Cache Instance: ( %s, %s )' % (objectCache.name, objectCache.jndiName))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+  
+    cacheProvider = getConfigId(self.adminConfig, scope, 'CacheProvider')
+    # objectCacheConfig = getConfigItemId(self.adminConfig, scope, 'ObjectCacheInstance', objectCache.name) 
+    objectCacheConfig = findConfigTargetWithScope(self.adminConfig, scope, objectCache.name, 'ObjectCacheInstance') 
+    if objectCacheConfig:
+      debug('Removing Object Cache Instance \'%s\' in scope %s' % (objectCache.name, scope))
+      removeConfigObject(self.adminConfig, 'ObjectCacheInstance', objectCacheConfig)
+
+    # Set options for AdminTask.createObjectCacheInstance command
+    options = [ '-name', objectCache.name,
+                '-jndiName', objectCache.jndiName ]
+               
+
+    debug('Creating Object Cache Instance \'%s\' in scope %s with Options %s' % (objectCache.name, scope, options))
+    objectCacheConfig = self.adminTask.createObjectCacheInstance(cacheProvider, options)
+
+  
+    attributes = getAttributes(self.adminConfig, 'ObjectCacheInstance', objectCache, ['jndiName', 'name'])
+    if attributes:
+      debug('Updating Object Cache Instance \'%s\' in scope %s' % (objectCache.name, scope))
+      modifyConfigObject(self.adminConfig, 'CacheProvider', objectCacheConfig, attributes)
+
+# Lookup the attributes for the webSphereType and build an attribute list from
+# the modelObject where they match.  An ecludeList may be passed to ignore some attributes.        
+def getAttributes(adminConfig, webSphereType, modelObject, excludeList = [] ):
+  attributeList = wsadminToList(adminConfig.attributes(webSphereType))
+  attributes = []  
+  for attribute in attributeList:
+     key = attribute.split(' ')[0]
+     if key not in excludeList:
+        type = attribute.split(' ')[1]
+        type = type.split('(')[0]
+        if type in ['String','int','long','ENUM', 'boolean']:
+          value = getattr(modelObject, key, None)
+          if value:
+             pair = [key, value]
+             attributes.append(pair)
+             
+  return attributes 
+  
+datasource.py
+ 
+from ewad.util import log, debug, raiseError, formatExceptionInfo, True, False
+from ewad.config import BaseConfigurator
+from ewad.config.finder import getAttribute, getConfigItemId, findScopeEntry, findDataSourceWithScope, getConfigObjectScoped, findJDBCProviderWithScope
+from ewad.model.resource.datasource import DatabaseType, ImplementationType
+from ewad.config.util import createConfigObject, modifyConfigObject, removeConfigObject, wsadminToList
+
+class DataSourceConfigurator(BaseConfigurator):
+  '''
+    Resource Configurator
+  '''
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, scope, dataSource):
+    log('Configuring DataSource: ( %s, %s )' % (dataSource.name, dataSource.jndiName))
+
+    # Get / Create the JDBCProvider
+    provider = self.getJdbcProvider(scope, dataSource.provider)
+
+    # Remove the DataSource if it already exists    
+    dataSourceConfig = findDataSourceWithScope(self.adminConfig, scope, dataSource.name)
+    if dataSourceConfig:
+      debug('Removing DataSource \'%s\' in scope %s' % (dataSource.name, scope))
+      removeConfigObject(self.adminConfig, 'DataSource', dataSourceConfig)
+
+    # Set options for AdminTask.createDataSource command
+    options = [ '-name', dataSource.name,
+                '-jndiName', dataSource.jndiName,
+                '-dataStoreHelperClassName', dataSource.provider.dataStoreHelperClassName,
+                '-description', dataSource.description]
+    if dataSource.configureResourceProperties:
+      options.append('-configureResourceProperties') 
+      options.append(dataSource.configureResourceProperties)
+    if dataSource.authenticationAlias:
+      options.append('-componentManagedAuthenticationAlias')
+      options.append(dataSource.authenticationAlias.name)
+ 
+    options.append('-containerManagedPersistence')
+    if dataSource.containerManagedPersistence:
+       options.append('true')
+    else:
+       options.append('false')
+
+    log('Creating DataSource \'%s\' in scope %s with Options %s' % (dataSource.name, scope, options))
+    dataSourceConfig = self.adminTask.createDatasource(provider, options)
+
+    # Update Optional Attributes of the object
+    attributes = [['statementCacheSize', dataSource.statementCacheSize],
+                  ['manageCachedHandles', dataSource.manageCacheHandles],
+                  ['logMissingTransactionContext', dataSource.logMissingContext]]
+    modifyConfigObject(self.adminConfig, 'DataSource', dataSourceConfig, attributes)
+    
+    # Configure the ConnectionPool  
+    self.configureConnectionPool(dataSourceConfig, dataSource.connectionPool)
+
+    # Get the propertySet of the DataSource 
+    propertySetId = getAttribute(self.adminConfig, dataSourceConfig, 'propertySet')
+    resourceProperties = getAttribute(self.adminConfig, propertySetId, 'resourceProperties')
+    propertyIds = wsadminToList(resourceProperties) 
+    # Loop thru the DataSource properties and see if anything in the dataSource.properies matches    
+    for propertyId in propertyIds:
+       key = propertyId.split('(')[0]
+       value = getattr(dataSource, key, None)
+       if value:
+          modifyConfigObject(self.adminConfig, 'J2EEResourceProperty', propertyId, [['value', value]], False)
+          debug('J2EEResourceProperty [[\'%s\', \'%s\']]' % (key, value))
+    # Handle UserDefinedDataSource properties
+    properties = getattr(dataSource, 'properties', None)
+    if properties:
+      for property in properties:
+         createConfigObject(self.adminConfig, 'J2EEResourceProperty', propertySetId,
+                  [['name', property[0]], ['type', property[1]], ['value', property[2]]])      
+
+
+  def getJdbcProvider(self, scope, provider):
+    log('Create JDBC Provider %s, if it does not exist' % provider.name)
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+      
+    providerConfig = findJDBCProviderWithScope(self.adminConfig, scope, provider.name)
+           
+    if providerConfig:
+      debug('\'%s\' already exists on scope %s, updating' % (provider.name, scope))
+      if provider.implementationType == ImplementationType.XA:
+         xaValue = 'true'
+      else:
+         xaValue = 'false'
+
+      attributes = [['name', provider.name],
+                  ['classpath', provider.classpath],
+                  ['implementationClassName', provider.implementationClassName],
+                  ['description', provider.description],
+                  ['xa', xaValue]]
+      modifyConfigObject(self.adminConfig, 'JDBCProvider', providerConfig, attributes)
+    else:
+      debug('JDBC Provider \'%s\' does not exist on scope %s - creating' % (provider.name, scope))
+      options = ['-scope', '%s=%s' % (scope.type, scope.name),
+                 '-databaseType', provider.databaseType,
+                 '-providerType', provider.providerType,
+                 '-implementationType', provider.implementationType,
+                 '-name', provider.name,
+                 '-classpath', provider.classpath,
+                 '-description', provider.description,
+                 '-implementationClassName', provider.implementationClassName]
+      log('Create JDBCProvider %s in scope %s with Options %s' % (provider.name, scope, options))
+      providerConfig = self.adminTask.createJDBCProvider(options)
+    return providerConfig
+  
+  def configureConnectionPool(self, dataSourceConfig, connectionPool):
+    attributes = [['connectionTimeout', connectionPool.connectionTimeout],
+                  ['maxConnections', connectionPool.maxConnections],
+                  ['minConnections', connectionPool.minConnections],
+                  ['reapTime', connectionPool.reapTime],
+                  ['unusedTimeout', connectionPool.unusedTimeout],
+                  ['agedTimeout', connectionPool.agedTimeout],
+                  ['purgePolicy', connectionPool.purgePolicy],
+                  ['testConnection', connectionPool.preTestConnection],
+                  ['testConnectionInterval', connectionPool.preTestConnectionInterval]] 
+    connectionPoolConfig = getConfigObjectScoped(self.adminConfig, dataSourceConfig, 'ConnectionPool')
+    if connectionPoolConfig:
+      modifyConfigObject(self.adminConfig, 'ConnectionPool', connectionPoolConfig, attributes)
+    else:
+      createConfigObject(self.adminConfig, 'ConnectionPool', dataSourceConfig, attributes)
+  
+env.py
+
+from ewad.util import log, debug, raiseError, formatExceptionInfo, True, False
+from ewad.config import BaseConfigurator
+from ewad.config.finder import getAttribute, findScopeEntry, findConfigTargetWithScope
+from ewad.config.util import createConfigObject, modifyConfigObject, removeConfigObject, wsadminToList
+
+class ResourceEnvironmentProviderConfigurator(BaseConfigurator):
+  '''
+    Resource Configurator
+  '''
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, scope, provider):
+    log('Configuring ResourceEnvironmentProvider: ( %s )' % (provider.name))
+
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+
+    # Remove the current provider if it exists    
+    providerConfig = findConfigTargetWithScope(self.adminConfig, scope, provider.name, 'ResourceEnvironmentProvider')
+    if providerConfig:
+       removeConfigObject(self.adminConfig, 'ResourceEnvironmentProvider', providerConfig)
+
+    debug('Creating ResourceEnvironmentProvider \'%s\' in scope %s' % (provider.name, scope))
+    providerConfig = createConfigObject(self.adminConfig, 'ResourceEnvironmentProvider', scopeEntry, [['name', provider.name],['description', provider.description]])
+    
+    propSet = getAttribute(self.adminConfig, providerConfig, 'propertySet') 
+    if propSet == None:
+       propSet = createConfigObject(self.adminConfig, 'J2EEResourcePropertySet', providerConfig, [])
+
+    for property in provider.properties:
+       attributes = '[[name ' + property.name + '] [type ' + property.type + '] [value \'' + property.value + '\'] [required ' + property.required + '] [description "' + property.description + '"]]'
+       createConfigObject(self.adminConfig, 'J2EEResourceProperty', propSet, attributes);  
+
+
+jca.py
+
+
+from ewad.util import log, debug, lineSeparator, raiseError, formatExceptionInfo, True, False
+from ewad.config import BaseConfigurator
+from ewad.config.finder import findScopeEntry, findJ2CResourceAdapterWithScope, findJ2CConnectionFactoryWithScope, getAttribute, getConfigItemId, getConfigObjectScoped
+from ewad.config.util import createConfigObject, createConfigObjectWithParentName, modifyConfigObject, removeConfigObject, wsadminToList
+from ewad.model.env import Node, Scope
+
+class J2CConnectionFactoryConfigurator(BaseConfigurator):
+  '''
+    Resource Configurator
+  '''
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, scope, connectionFactory):
+    log('Configuring J2CConnectionFactory: ( %s, %s )' % (connectionFactory.name, connectionFactory.jndiName))
+    
+    # Get / Create J2CResourceAdapter
+    resourceAdapter = self.getResourceAdapter(scope, connectionFactory.resourceAdapter)
+    
+       
+    connectionFactoryConfig = findJ2CConnectionFactoryWithScope(self.adminConfig, scope, connectionFactory.name)
+    if connectionFactoryConfig:
+      debug('Removing J2CConnectionFactory \'%s\' in scope %s' % (connectionFactory.name, scope))
+      removeConfigObject(self.adminConfig, 'J2CConnectionFactory', connectionFactoryConfig)
+
+    options = ['-connectionFactoryInterface', connectionFactory.resourceClass,
+               '-name', connectionFactory.name,
+               '-jndiName',  connectionFactory.jndiName]
+      
+    log('Creating J2CConnectionFactory \'%s\' in scope %s with Options %s' % (connectionFactory.name, scope, options))               
+    connectionFactoryConfig = self.adminTask.createJ2CConnectionFactory(resourceAdapter, options)
+
+    # Update Optional Attributes of the object
+    attributes = [['description', connectionFactory.description],
+                  ['authMechanismPreference', connectionFactory.authMechanismPreference]]
+    if connectionFactory.authenticationAlias:
+       attributes.append(['authDataAlias', connectionFactory.authenticationAlias.name])
+              
+    modifyConfigObject(self.adminConfig, 'J2CConnectionFactory', connectionFactoryConfig, attributes)
+
+    # Configure the Connection Pool  
+    self.configureConnectionPool(connectionFactoryConfig, connectionFactory.connectionPool)
+
+    # Configure the MappingModule
+    if connectionFactory.authenticationAlias:
+       self.configureMappingModule(connectionFactoryConfig, connectionFactory.authenticationAlias.name)
+
+    # Get the propertySet of the ConnectionFactory 
+    propertySetId = getAttribute(self.adminConfig, connectionFactoryConfig, 'propertySet')
+    resourceProperties = getAttribute(self.adminConfig, propertySetId, 'resourceProperties')
+    propertyIds = wsadminToList(resourceProperties) 
+    # Loop thru the DataSource properties and see if anything in the dataSource.properies matches    
+    for propertyId in propertyIds:
+       key = propertyId.split('(')[0]
+       value = getattr(connectionFactory, key, None)
+       if value:
+          modifyConfigObject(self.adminConfig, 'J2EEResourceProperty', propertyId, [['value', value]], False)
+          debug('J2EEResourceProperty [[\'%s\', \'%s\']]' % (key, value))
+    
+  def getResourceAdapter(self, scope, resourceAdapter):
+    log('Create J2CResourceAdapter %s, if it does not exist' % resourceAdapter.name)
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+      
+    attributes = [['archivePath', resourceAdapter.archivePath],
+                  ['singleton', resourceAdapter.singleton],
+                  ['hACapability', resourceAdapter.hACapability],
+                  ['isEnableHASupport', resourceAdapter.isEnableHASupport],
+                  ['isolatedClassLoader', resourceAdapter.isolatedClassLoader],
+                  ['classpath', resourceAdapter.classpath],
+                  ['description', resourceAdapter.description]]
+
+    resourceAdapterConfig = findJ2CResourceAdapterWithScope(self.adminConfig, scope, resourceAdapter.name)
+    if resourceAdapterConfig:
+      debug('\'%s\' already exists on scope %s, updating' % (resourceAdapter.name, scope))
+      modifyConfigObject(self.adminConfig, 'J2CResourceAdapter', resourceAdapterConfig, attributes)
+    else:
+      debug('J2CResourceAdapter \'%s\' does not exist on scope %s' % (resourceAdapter.name, scope))
+      nodes = self.findNodesInScope(scope)
+      for node in nodes:
+        ra = findJ2CResourceAdapterWithScope(self.adminConfig, node.scope, resourceAdapter.name)
+        if ra:
+           debug('J2CResourceAdapter \'%s\' is installed on node %s' % (resourceAdapter.name, node.name))
+        else:           
+           option  = ['-rar.name', resourceAdapter.name, '-rar.desc', resourceAdapter.description]
+           debug('Installing J2CResourceAdapter \'%s\' on node %s with option %s' % (resourceAdapter.name, node.name, option))
+           ra = self.adminConfig.installResourceAdapter(resourceAdapter.archiveFile, node.name, option)
+
+      if ra:
+         log('Copying J2CResourceAdapter %s to scope %s' % (resourceAdapter.name, scope))
+         resourceAdapterConfig = self.adminTask.copyResourceAdapter(ra, ['-name', resourceAdapter.name, '-scope', scopeEntry])
+      else:
+        raiseError('Could not install J2CResourceAdapter %s' % resourceAdapter.name)
+
+
+    # Get the propertySet of the ResourceAdapter
+    propertySetId = getAttribute(self.adminConfig, resourceAdapterConfig, 'propertySet')
+    resourceProperties = getAttribute(self.adminConfig, propertySetId, 'resourceProperties')
+    propertyIds = wsadminToList(resourceProperties) 
+    # Loop thru the ResourceAdapter properties and see if anything in the J2CResourceAdapter matches    
+    for propertyId in propertyIds:
+       key = propertyId.split('(')[0]
+       value = getattr(resourceAdapter, key, None)
+       if value:
+          modifyConfigObject(self.adminConfig, 'J2EEResourceProperty', propertyId, [['value', value]], False)
+          debug('J2EEResourceProperty [[\'%s\', \'%s\']]' % (key, value))
+       
+    return resourceAdapterConfig
+  
+ 
+  def configureConnectionPool(self, connectionFactoryConfig, connectionPool):
+    attributes = [['connectionTimeout', connectionPool.connectionTimeout],
+                  ['maxConnections', connectionPool.maxConnections],
+                  ['minConnections', connectionPool.minConnections],
+                  ['reapTime', connectionPool.reapTime],
+                  ['unusedTimeout', connectionPool.unusedTimeout],
+                  ['agedTimeout', connectionPool.agedTimeout],
+                  ['purgePolicy', connectionPool.purgePolicy],
+                  ['testConnection', connectionPool.testConnection],
+                  ['testConnectionInterval', connectionPool.testConnectionInterval]] 
+    connectionPoolConfig = getConfigObjectScoped(self.adminConfig, connectionFactoryConfig, 'ConnectionPool')
+    if connectionPoolConfig:
+      modifyConfigObject(self.adminConfig, 'ConnectionPool', connectionPoolConfig, attributes)
+    else:
+      createConfigObject(self.adminConfig, 'ConnectionPool', connectionFactoryConfig, attributes)
+
+  def configureMappingModule(self, connectionFactoryConfig, authDataAlias):
+    attributes = [['authDataAlias', authDataAlias], ['mappingConfigAlias', 'DefaultPrincipalMapping']]    
+    mappingConfig = getAttribute(self.adminConfig, connectionFactoryConfig, 'mapping')
+    if mappingConfig:
+          modifyConfigObject(self.adminConfig, 'mapping', mappingConfig, attributes)
+    else:
+      createConfigObjectWithParentName(self.adminConfig, 'MappingModule', connectionFactoryConfig, attributes, 'mapping')
+
+      
+  def findNodesInScope(self, scope):
+    nodes = []
+    nodeList = ','
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if scope.type == Scope.CLUSTER:
+       elements = self.adminConfig.list('ClusterMember', scopeEntry)
+       elementList = elements.split(lineSeparator)
+       for element in elementList:
+         element = element.rstrip()
+         nodeName = self.adminConfig.showAttribute(element, 'nodeName')
+         # use nodeList string to avoid duplicate Node Names being returned.
+         if (nodeList.find(nodeName + ',') < 0):
+            nodeList = nodeList + nodeName + ','
+            nodes.append(Node(nodeName))
+    if scope.type == Scope.SERVER:
+       nodes.append(Node(scope.node.name))
+    return nodes
+
+jms.py
+
+from ewad.util import log, debug, raiseError, True, False
+from ewad.config.finder import findConfigTargetWithScope, findJ2CResourceAdapterWithScope, findScopeEntry, getConfigItemId, getConfigObjectScoped, getAttribute
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, createConfigObjectWithParentName, modifyConfigObject, removeConfigObject, wsadminToList
+
+class MqConnectionFactoryConfigurator(BaseConfigurator):
+
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, mqConnectionFactory):  
+    log('Configuring MqConnectionFactory: ( %s, %s, type=%s )' % (mqConnectionFactory.name, mqConnectionFactory.jndiName, mqConnectionFactory.type))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+    
+    # Remove any existing ConnectionFactory
+    found = 0
+    for factoryType in [ 'MQConnectionFactory', 'MQQueueConnectionFactory', 'MQTopicConnectionFactory' ]:
+      if not found:
+        connectionFactoryConfig = getConfigItemId(self.adminConfig, scope, 'JMSProvider:WebSphere MQ JMS Provider/' + factoryType, mqConnectionFactory.name)
+        if connectionFactoryConfig:
+           found = 1
+           debug('Connection Factory \'%s\' exists in scope %s as type %s, removing' % (mqConnectionFactory.name, scope, factoryType))
+           removeConfigObject(self.adminConfig, factoryType, connectionFactoryConfig)
+           connectionFactoryConfig = None
+         
+    factoryType = 'CF'
+    if mqConnectionFactory.type == 'MQQueueConnectionFactory':
+      factoryType = 'QCF'
+    if mqConnectionFactory.type == 'MQTopicConnectionFactory':
+      factoryType = 'TCF'
+ 
+    # Set options for AdminTask.createWMQConnectionFactory command
+    options = [ '-name', mqConnectionFactory.name,
+                '-jndiName', mqConnectionFactory.jndiName,
+                '-type', factoryType,
+                '-qmgrName', mqConnectionFactory.queueManagerName,
+                '-qmgrHostname', mqConnectionFactory.queueManagerHost,
+                '-qmgrPortNumber', mqConnectionFactory.queueManagerPort,
+                '-qmgrSvrconnChannel', mqConnectionFactory.channel,
+                '-wmqTransportType', mqConnectionFactory.transportType  ]
+                
+    if mqConnectionFactory.authenticationAlias:
+      options.append('-containerAuthAlias')
+      options.append(mqConnectionFactory.authenticationAlias.name)
+      options.append('-componentAuthAlias')
+      options.append(mqConnectionFactory.authenticationAlias.name)
+
+    debug('Creating MQConnectionFactory \'%s\' in scope %s with Options %s' % (mqConnectionFactory.name, scope, options))
+    connectionFactoryConfig = self.adminTask.createWMQConnectionFactory(scopeEntry, options)
+    
+    attributes = getAttributes(self.adminConfig, mqConnectionFactory.type, mqConnectionFactory, ['name', 'jndiName', 'channel', 'transportType'])  
+
+    debug('Updating Connection Factory \'%s\' in scope %s' % (mqConnectionFactory.name, scope))
+    modifyConfigObject(self.adminConfig, mqConnectionFactory.type, connectionFactoryConfig, attributes)
+    
+    # Setup ConnectionPool / SessionPool    
+    if mqConnectionFactory.connectionPool:
+      self.configureConnectionPool(connectionFactoryConfig, mqConnectionFactory.connectionPool)
+    if mqConnectionFactory.sessionPool:
+      self.configureSessionPool(connectionFactoryConfig, mqConnectionFactory.sessionPool)
+
+    debug('Create/Update of MQ Connection Factory was successful.')
+
+
+  def configureConnectionPool(self, connectionFactoryConfig, connectionPool):
+    attributes = getAttributes(self.adminConfig, 'ConnectionPool', connectionPool)
+    
+    connectionPoolConfig = getAttribute(self.adminConfig, connectionFactoryConfig, 'connectionPool')
+    if connectionPoolConfig:
+          modifyConfigObject(self.adminConfig, 'ConnectionPool', connectionPoolConfig, attributes)
+    else:
+      createConfigObjectWithParentName(self.adminConfig, 'ConnectionPool', connectionFactoryConfig, attributes, 'connectionPool')
+    
+  def configureSessionPool(self, connectionFactoryConfig, sessionPool):
+    attributes = getAttributes(self.adminConfig, 'ConnectionPool', sessionPool)
+    
+    sessionPoolConfig = getAttribute(self.adminConfig, connectionFactoryConfig, 'sessionPool')
+    if sessionPoolConfig:
+       modifyConfigObject(self.adminConfig, 'ConnectionPool', sessionPoolConfig, attributes)
+    else:
+       createConfigObjectWithParentName(self.adminConfig, 'ConnectionPool', connectionFactoryConfig, attributes, 'sessionPool')
+
+class MqQueueConfigurator(BaseConfigurator):    
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, mqQueue):
+    log('Configuring MqQueue: ( %s, %s )' % (mqQueue.name, mqQueue.jndiName))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+  
+    mqQueueConfig = getConfigItemId(self.adminConfig, scope, 'JMSProvider:WebSphere MQ JMS Provider/MQQueue', mqQueue.name)  
+    if mqQueueConfig:
+      debug('Removing MQQueue \'%s\' in scope %s' % (mqQueue.name, scope))
+      removeConfigObject(self.adminConfig, 'MQQueue', mqQueueConfig)
+
+    # Set options for AdminTask.createWMQQueue command
+    options = [ '-name', mqQueue.name,
+                '-jndiName', mqQueue.jndiName,
+                '-description', mqQueue.description,
+                '-queueName', mqQueue.baseQueueName ]
+
+    debug('Creating MQQueue \'%s\' in scope %s with Options %s' % (mqQueue.name, scope, options))
+    mqQueueConfig = self.adminTask.createWMQQueue(scopeEntry, options)
+
+    attributes = getAttributes(self.adminConfig, 'MQQueue', mqQueue, ['baseQueueName','description', 'jndiName', 'name'])
+    if attributes:
+      debug('Updating MQQueue \'%s\' in scope %s' % (mqQueue.name, scope))
+      modifyConfigObject(self.adminConfig, 'MQQueue', mqQueueConfig, attributes)
+
+class MqTopicConfigurator(BaseConfigurator):    
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, mqTopic):
+    log('Configuring MQTopic: ( %s, %s )' % (mqTopic.name, mqTopic.jndiName))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+  
+    mqTopicConfig = getConfigItemId(self.adminConfig, scope, 'JMSProvider:WebSphere MQ JMS Provider/MQTopic', mqTopic.name)  
+    if mqTopicConfig:
+      debug('Removing MQTopic \'%s\' in scope %s' % (mqTopic.name, scope))
+      removeConfigObject(self.adminConfig, 'MQTopic', mqTopicConfig)
+
+    # Set options for AdminTask.createWMQTopic command
+    options = [ '-name', mqTopic.name,
+                '-jndiName', mqTopic.jndiName,
+                '-description', mqTopic.description,
+                '-topicName', mqTopic.baseTopicName ]
+
+    debug('Creating MQTopic \'%s\' in scope %s with Options %s' % (mqTopic.name, scope, options))
+    mqTopicConfig = self.adminTask.createWMQTopic(scopeEntry, options)
+
+    attributes = getAttributes(self.adminConfig, 'MQTopic', mqTopic, ['baseTopicName','description', 'jndiName', 'name'])
+    if attributes:
+      debug('Updating MQTopic \'%s\' in scope %s' % (mqTopic.name, scope))
+      modifyConfigObject(self.adminConfig, 'MQTopic', mqTopicConfig, attributes)
+      
+      
+class MQActivationSpecConfigurator(BaseConfigurator):
+  '''
+    Resource Configurator
+  '''
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, scope, activationSpec):
+    log('Configuring ActivationSpec: ( %s, %s )' % (activationSpec.name, activationSpec.jndiName))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+    
+    resourceAdapterConfig = findJ2CResourceAdapterWithScope(self.adminConfig, scope, activationSpec.resourceAdapter.name)
+    if resourceAdapterConfig:
+       debug('Modifying ResourceAdapter ( %s )' % activationSpec.resourceAdapter.name)
+       # update the resourcePropertis of the ResourceAdapter
+       propertySetId = getAttribute(self.adminConfig, resourceAdapterConfig, 'propertySet')
+       resourceProperties = getAttribute(self.adminConfig, propertySetId, 'resourceProperties')
+       setResourceProperties(self.adminConfig, resourceProperties, activationSpec.resourceAdapter)
+                
+    # Remove the ActivationSpec if it already exists
+    activationSpecConfig = findConfigTargetWithScope(self.adminConfig, scope, activationSpec.name, 'J2CActivationSpec')
+    if activationSpecConfig:
+      debug('Removing ActivationSpec \'%s\' in scope %s' % (activationSpec.name, scope))
+      removeConfigObject(self.adminConfig, 'ActivationSpec', activationSpecConfig)
+    
+    # Set options for AdminTask.createWMQActivationSpec command
+    options = [ '-name', activationSpec.name,
+                '-jndiName', activationSpec.jndiName,
+                '-description', activationSpec.description,
+                '-destinationJndiName', activationSpec.jmsDestination,
+                '-destinationType', activationSpec.jmsDestinationType]
+                
+    if activationSpec.subscriptionName:
+      options.append('-subscriptionName')
+      options.append(activationSpec.subscriptionName)
+      
+    if activationSpec.connectionFactory:
+      options.append('-qmgrName') 
+      options.append(activationSpec.connectionFactory.queueManagerName)    
+      options.append('-qmgrHostname') 
+      options.append(activationSpec.connectionFactory.queueManagerHost)
+      options.append('-qmgrPortNumber') 
+      options.append(activationSpec.connectionFactory.queueManagerPort)
+      if activationSpec.connectionFactory.authenticationAlias:
+        options.append('-authAlias')
+        options.append(activationSpec.connectionFactory.authenticationAlias.name)
+      if activationSpec.clientID:
+        options.append('-clientId')
+        options.append(activationSpec.clientID)
+        
+    debug('Creating ActivationSpec \'%s\' in scope %s with Options %s' % (activationSpec.name, scope, options))
+    activationSpecConfig = self.adminTask.createWMQActivationSpec(scopeEntry, options)
+    
+    # Get the resourceProperties of the ActivationSpec 
+    resourceProperties = getAttribute(self.adminConfig, activationSpecConfig, 'resourceProperties')
+    setResourceProperties(self.adminConfig, resourceProperties, activationSpec.connectionFactory)
+    setResourceProperties(self.adminConfig, resourceProperties, activationSpec)
+
+#
+# Common subroutines
+#
+def setResourceProperties(adminConfig, resourceProperties, object):
+  propertyIds = wsadminToList(resourceProperties) 
+  # Loop thru the properties and see if anything in the object matches    
+  for propertyId in propertyIds:
+     key = propertyId.split('(')[0]
+     value = getattr(object, key, None)
+     if value:
+        modifyConfigObject(adminConfig, 'J2EEResourceProperty', propertyId, [['value', value]], False)
+        debug('J2EEResourceProperty [[\'%s\', \'%s\']]' % (key, value))
+          
+# Lookup the attributes for the webSphereType and build an attribute list from
+# the modelObject where they match.  An ecludeList may be passed to ignore some attributes.        
+def getAttributes(adminConfig, webSphereType, modelObject, excludeList = [] ):
+  attributeList = wsadminToList(adminConfig.attributes(webSphereType))
+  attributes = []  
+  for attribute in attributeList:
+     key = attribute.split(' ')[0]
+     if key not in excludeList:
+        type = attribute.split(' ')[1]
+        type = type.split('(')[0]
+        if type in ['String','int','long','ENUM', 'boolean']:
+          value = getattr(modelObject, key, None)
+          if value:
+             pair = [key, value]
+             attributes.append(pair)
+             
+  return attributes 
+
+url.py
+
+from ewad.util import log, debug, raiseError
+from ewad.config.finder import getConfigItemId, findConfigTargetWithScope, findScopeEntry
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, modifyConfigObject
+
+class UrlConfigurator(BaseConfigurator):    
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, url):
+    log('Configuring URL: ( %s, %s, %s )' % (url.name, url.jndiName, url.url))
+  
+    urlProvider = self.getUrlProvider(scope, 'DefaultURLProvider')
+  
+    attributes = [['name', url.name],
+                  ['jndiName', url.jndiName],
+                  ['spec', url.url],
+                  ['description', 'URL: %s' % url.name],
+                  ['category', '']]
+  
+    urlConfig = findConfigTargetWithScope(self.adminConfig, scope, url.name, 'URL')
+    if urlConfig:
+      debug('URL exists, updating')
+      modifyConfigObject(self.adminConfig, 'URL', urlConfig, attributes)
+    else:  
+      debug('URL does not exists, creating')
+      createConfigObject(self.adminConfig, 'URL', urlProvider, attributes)
+
+  def getUrlProvider (self, scope, providerName):
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if not scopeEntry:
+      raiseError('scope %s does not exist.' % scope)
+    
+    provider = getConfigItemId(self.adminConfig, scope, 'URLProvider', providerName)
+    if provider:
+      debug('Provider %s exists on scope %s' % (providerName, scope))
+    else:
+      log('Configuring URL Provider: ( %s )' % providerName)
+      attributes = [['name', providerName],
+                    ['streamHandlerClassName', ''],
+                    ['protocol', ''],
+                    ['classpath', ''],
+                    ['description', '']]
+      provider = createConfigObject(self.adminConfig, 'URLProvider', scopeEntry, attributes)
+    return provider
+
+	
+__init__.py
+
+
+class BaseConfigurator:
+  '''
+    Configurator Base
+  '''
+  
+  def __init__(self, adminConfig, adminTask):
+    self.adminConfig = adminConfig
+    self.adminTask = adminTask
+	
+application.py
+
+import os
+from ewad.util import lineSeparator, log, debug, raiseError, formatExceptionInfo
+from ewad.model.env import Scope
+from ewad.config import BaseConfigurator
+from ewad.config.finder import getId, getAttribute
+from ewad.config.util import createConfigObject, modifyConfigObject, wsadminToList
+from time import sleep
+
+class ApplicationConfigurator(BaseConfigurator):
+  
+  def __init__(self, adminConfig, adminTask, adminApp):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    self.adminApp = adminApp
+  
+  def configure(self, application):
+    aprName = "AppSightRecorder"
+    if application.name == aprName:
+     appMapping = None
+     servers = None
+     portSeed = None
+     if self.appExist(application):
+      log('This Application already exists: ( %s )' % application.name)
+     else:
+      # create virtual apr host
+      log('Create virtual apr host')
+      apr_host = getId(self.adminConfig, '/VirtualHost:apr_host/')
+      if apr_host:
+       log('apr_host already created')
+      else:
+       log('Cell: ( %s )' % application.target.cell.name)	
+       cell = getId( self.adminConfig, '/Cell:' + application.target.cell.name + '/' )
+       vtempl = self.adminConfig.listTemplates('VirtualHost', 'default_host')
+       self.adminConfig.createUsingTemplate('VirtualHost', cell, [['name', 'apr_host']], vtempl)
+       apr_host = getId(self.adminConfig, '/VirtualHost:apr_host/')
+       if apr_host:
+        log('Created apr_host')
+
+      # install application
+      if application.target.scope.type == Scope.CLUSTER:
+       self.installToCluster(application.target, application)
+      else:
+       self.installToServer(application.target, application)
+
+      # setup BA privileges for apr; change id listed here
+      log('Set basic auth privileges')
+      self.adminApp.edit( application.name , '[-MapRolesToUsers [["administrator" No No "CN=apr_user,OU=Members,o=LogonLdap" ""]]]')
+
+      # set starting weight to 0; startingweight=startuporder displayed in gui
+      log('Set starting weight')
+      applicationConfig = getId(self.adminConfig, '/Deployment:%s/' % application.name)
+      deployedObject = getAttribute(self.adminConfig, applicationConfig, 'deployedObject')
+      modifyConfigObject(self.adminConfig, 'startingWeight', deployedObject, [['startingWeight', '0']])
+
+     ################################### 
+     # APP SPECIFIC MODIFICATIONS 
+     ###################################
+     if application.target.scope.type == Scope.CLUSTER:
+      # setup app mapping
+      log('Set application mapping')
+      appMapping = '+WebSphere:cell=' + application.target.cell.name + ",cluster=" + application.target.name 
+
+      # get servers in cluster info
+      clusterID=getId(self.adminConfig, '/ServerCluster:' + application.target.name + '/')
+      clusterList=self.adminConfig.list('ClusterMember', clusterID)
+      servers=clusterList.split(lineSeparator)
+     
+      # get port seed
+      # we're only passed one cluster, not a cluster list, using array to future proof it
+      for member in application.target.members:
+       portSeed = "25" + member.portSeed 	
+     
+     else:
+      log('Server install')
+      # setup app mapping
+      appMapping = '+WebSphere:cell=' + application.target.cell.name + ",node=" + application.target.node.name + ',server=' + application.target.name
+
+      # get servers in cluster info
+      serverID = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + application.target.node.name + '/Server:' + application.target.name + '/')
+      servers=[serverID] 
+      
+      # get port seed
+      portSeed = "25" + application.target.portSeed 	
+
+     # map apr to app	
+     self.adminApp.edit( application.name , ['-MapModulesToServers', [['.*', '.*', appMapping ]]])
+
+     # enable pmi on the deployed jvm
+     log('Enable PMI on jvms')
+     if servers:
+      for serverID in servers:
+       if application.target.scope.type == Scope.CLUSTER:
+          serverName=self.adminConfig.showAttribute(serverID, 'memberName')
+          nodeName=self.adminConfig.showAttribute(serverID, 'nodeName')
+          s1 = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + nodeName + '/Server:' + serverName + '/')
+
+       else:
+          serverName=self.adminConfig.showAttribute(serverID, 'name')
+          s1 = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + application.target.node.name + '/Server:' + serverName + '/')	
+       pmi = self.adminConfig.list('PMIService', s1)
+       self.adminConfig.modify(pmi, [['enable', 'true'], ['statisticSet','all']])
+       # increase max heap
+       #jvm = self.adminConfig.list('JavaVirtualMachine', s1)
+       #m = self.adminConfig.showAttribute(jvm, "maximumHeapSize")
+       #m = int(m) + 128
+       #self.adminConfig.modify(jvm, [['maximumHeapSize', m]])
+
+     # create host alias 
+     # need to check for existence or else host alias is created multiple times
+     log('Create host alias')
+     hostAliasInstalled = 0
+     apr_host = getId(self.adminConfig, '/VirtualHost:apr_host/')
+     hostAliasList = self.adminConfig.list('HostAlias',apr_host)
+     hostAliases = hostAliasList.split(lineSeparator)
+     # get list of host aliases for apr_host
+     if hostAliases:
+      if len(hostAliases[0]) > 0:
+       # change showattr to in house methods
+       for hostAlias in hostAliases:
+        hostName = self.adminConfig.showAttribute(hostAlias, 'hostname')
+        port = self.adminConfig.showAttribute(hostAlias, 'port')
+        if portSeed == port:
+         if hostName == '*':
+          hostAliasInstalled = 1
+
+     if hostAliasInstalled == 0:
+      self.adminConfig.modify(apr_host, [['aliases', [[['port', portSeed], ['hostname', '*']]]]])
+      log('Host alias now installed')
+     else:
+      log('Host alias already exists')
+
+    else:
+     # unmap bbx from app, if mapped; bbx is installed after app, so it will be remapped then
+     bbxAppInstalled = getId(self.adminConfig, '/Deployment:' + aprName + '/')
+     if bbxAppInstalled:
+      if application.target.scope.type == Scope.CLUSTER:
+       Options = '-WebSphere:cell=' + application.target.cell.name + ',cluster=' + application.target.name
+       clusterID=getId(self.adminConfig, '/ServerCluster:' + application.target.name + '/')
+       clusterList=self.adminConfig.list('ClusterMember', clusterID)
+       servers=clusterList.split(lineSeparator)
+       # get port seed
+       # we're only passed one cluster, not a cluster list, using array to future proof it
+       for member in application.target.members:
+        portSeed = "25" + member.portSeed 	
+      else:
+       Options = '-WebSphere:cell=' + application.target.cell.name + ',node=' + application.target.node.name + ',server=' + application.target.name
+       serverID = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + application.target.node.name + '/Server:' + application.target.name + '/')
+       servers=[serverID]
+       # get port seed
+       portSeed = "25" + application.target.portSeed 	
+      # unmap bbx from jvm; this is effective if bbx is mapped or not
+      self.adminApp.edit(aprName, ['-MapModulesToServers', [['.*', '.*', Options]]] ) 
+      # remove host alias
+      # need to check for existence or else host alias is created multiple times
+      log('Create host alias')
+      hostAliasInstalled = 0
+      apr_host = getId(self.adminConfig, '/VirtualHost:apr_host/')
+      hostAliasList = self.adminConfig.list('HostAlias',apr_host)
+      hostAliases = hostAliasList.split(lineSeparator)
+      # get list of host aliases for apr_host
+      if hostAliases:
+       if len(hostAliases[0]) > 0:
+        # change showattr to in house methods
+        for hostAlias in hostAliases:
+         hostName = self.adminConfig.showAttribute(hostAlias, 'hostname')
+         port = self.adminConfig.showAttribute(hostAlias, 'port')
+         if portSeed == port:
+          if hostName == '*':
+           self.adminConfig.remove(hostAlias) 
+      # disable pmi
+      if servers:
+       for serverID in servers:
+	if application.target.scope.type == Scope.CLUSTER:
+          serverName=self.adminConfig.showAttribute(serverID, 'memberName')
+          nodeName=self.adminConfig.showAttribute(serverID, 'nodeName')
+          s1 = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + nodeName + '/Server:' + serverName + '/')
+
+        else:
+         serverName=self.adminConfig.showAttribute(serverID, 'name')
+         s1 = getId(self.adminConfig, '/Cell:' + application.target.cell.name + '/Node:' + application.target.node.name + '/Server:' + serverName + '/')
+
+        pmi = self.adminConfig.list('PMIService', s1)
+        self.adminConfig.modify(pmi, [['enable', 'true'], ['statisticSet','basic']])
+        # decrease max heap
+        #jvm = self.adminConfig.list('JavaVirtualMachine', s1)
+        #m = self.adminConfig.showAttribute(jvm, "maximumHeapSize")
+        #m = int(m) - 128
+        #self.adminConfig.modify(jvm, [['maximumHeapSize', m]])
+     if self.appExist(application):
+      self.uninstall(application)
+     self.correctEarName(application)  
+     if application.target.scope.type == Scope.CLUSTER:
+      self.installToCluster(application.target, application)
+     else:
+       self.installToServer(application.target, application)
+     applicationConfig = getId(self.adminConfig, '/Deployment:%s/' % application.name)
+     deployedObject = getAttribute(self.adminConfig, applicationConfig, 'deployedObject')
+     self.configureClassloader(application, deployedObject)
+     self.configureJsfImplementation(application, deployedObject)
+     if application.roleMappings:
+      self.configureRoleMappings(application, deployedObject)
+     for module in application.modules:
+      self.configureModule(application, deployedObject, module)
+  
+  def uninstall(self, application):
+    if self.appExist(application):
+      log('Uninstalling Application: ( %s )' % application.name)
+      try:
+        self.adminApp.uninstall(application.name)
+      except:
+        raiseError('Caught Exception uninstalling application - %s' % formatExceptionInfo())  
+      waitCount = 0
+      while self.appExist(application) and waitCount < 25:
+        debug('Sleeping for 5 seconds waiting for un-install')
+        sleep(5)
+        waitCount = waitCount + 1
+    debug('Application uninstall complete')
+        
+
+  def appExist(self, application):
+    return getId(self.adminConfig, '/Deployment:%s/' % application.name) != None
+  
+  def installToServer(self, server, application):
+    log('Installing Application: ( %s )' % application.name)
+    try:
+      self.adminApp.install(application.ear, ['-appname', application.name, '-node', server.node.name,
+                                     '-server', server.name, '-MapWebModToVH', [['.*', '.*', application.virtualHost ]],
+                                     '-distributeApp', '-nouseMetaDataFromBinary', 
+                                     '-nodeployws', '-validateinstall', 'warn', '-processEmbeddedConfig',
+                                     '-noallowDispatchRemoteInclude', '-noallowServiceRemoteInclude'])
+      debug('Application install complete')
+    except:
+        raiseError('Caught Exception installing application - %s' % formatExceptionInfo())
+  
+  def installToCluster(self, cluster, application):
+    log('Installing Application: ( %s )' % application.name)
+    try:
+      self.adminApp.install(application.ear, ['-appname', application.name, '-cluster', cluster.name,
+                                     '-MapWebModToVH', [['.*', '.*', application.virtualHost ]],
+                                     '-distributeApp', '-nouseMetaDataFromBinary',
+                                     '-nodeployws', '-validateinstall', 'warn', '-processEmbeddedConfig',
+                                     '-noallowDispatchRemoteInclude', '-noallowServiceRemoteInclude'])
+      debug('Application install complete')
+    except:
+      raiseError('Caught Exception installing application - %s' % formatExceptionInfo())
+
+  def correctEarName(self, application):
+    if not os.path.exists(application.ear):
+      # Given EAR name does not exist.  Search for an EAR file in the current directory 
+      for fileName in os.listdir('.'):
+         if fileName.lower().endswith('.ear'):
+           log('Requested EAR file %s does not exist.  Using %s instead.' % (application.ear, fileName))
+           application.ear = fileName
+           return
+                
+
+  def configureClassloader(self, application, deployedObject):
+    modifyConfigObject(self.adminConfig, 'ClassLoader', deployedObject, [['warClassLoaderPolicy', application.classloaderPolicy]])
+    classLoader = getAttribute(self.adminConfig, deployedObject, 'classloader')
+    modifyConfigObject(self.adminConfig, 'ClassLoader', classLoader, [['mode', application.classloaderMode]])
+    for sharedLibrary in application.sharedLibraries:
+      self.configureSharedLibraryRefrence(application, classLoader, sharedLibrary)
+  
+  def configureJsfImplementation(self, application, deployedObject):
+    log('Modifying JSF Implementation Type to  ( %s )' % application.jsfProvider)
+    self.adminTask.modifyJSFImplementation(application.name, ('-implName',  application.jsfProvider))
+    
+  
+  def configureSharedLibraryRefrence(self, application, classLoader, sharedLibrary):
+    sharedLibraryConfig = getId(self.adminConfig, '/Library:%s/' % sharedLibrary.name)
+    if not sharedLibraryConfig:
+      raiseError('SharedLibrary %s does not exist.' % sharedLibrary.name)
+    createConfigObject(self.adminConfig, 'LibraryRef', classLoader, [['libraryName', sharedLibrary.name], ['sharedClassloader', 'true']])
+    
+  def configureRoleMappings(self, application, deployedObject):
+    try:
+      roleAttributes = []
+      for roleMapping in application.roleMappings:
+        roleAttributes.append([roleMapping.name, roleMapping.everyone, roleMapping.allAuthenticated, roleMapping.users, roleMapping.groups])
+      attributes = ['-MapRolesToUsers', roleAttributes]
+      self.adminApp.edit(application.name, attributes)
+      debug('Modified RoleMappings with attributes %s' % attributes) 
+    except:
+      raiseError('Caught Exception modifying Application.RoleMappings - %s' % formatExceptionInfo())
+ 
+  def configureModule(self, application, deployedObject, module):
+    moduleConfig = self.getModuleConfig(application, deployedObject, module)
+    if moduleConfig.find('WebModuleDeployment') != - 1:
+      self.configureWebModule(application, module, moduleConfig)
+    
+  def getModuleConfig(self, application, deployedObject, module):  
+    modulesConfigs = wsadminToList(getAttribute(self.adminConfig, deployedObject, 'modules'))
+    for moduleConfig in modulesConfigs:
+      if module.uri == getAttribute(self.adminConfig, moduleConfig, 'uri'):
+        return moduleConfig
+      
+  def configureWebModule(self, application, module, moduleConfig):
+    try:
+      attributes = ['-MapWebModToVH', [[module.name, '%s,WEB-INF/web.xml' % module.uri, module.virtualHost]]]
+      self.adminApp.edit(application.name, attributes)
+      debug('Modified Module.VirtualHost with attributes %s' % attributes) 
+    except:
+      raiseError('Caught Exception setting module %s, %s virtual host to %s - %s' % (module.name, module.uri, module.virtualHost, formatExceptionInfo()))
+    modifyConfigObject(self.adminConfig, 'Module.ClassLoader', moduleConfig, [['classloaderMode', module.classloaderMode]])
+    self.configureModuleSessionManagement(application, module, module.sessionManager, moduleConfig)
+
+  def configureModuleSessionManagement(self, application, module, sessionManager, moduleConfig):
+    attributes = [['name', '%s ModuleConfig' % module.uri],
+                  ['description', 'Web Module config'],
+                  ['sessionManagement', [ 
+                   ['enable', sessionManager.enable],
+                   ['maxWaitTime', sessionManager.maxWaitTime],
+                   ['enableCookies', sessionManager.enableCookies],
+                   ['tuningParams', [['invalidationTimeout', sessionManager.invalidationTimeout], ['maxInMemorySessionCount', sessionManager.maxInMemorySessionCount]]],
+                   ['defaultCookieSettings', [['name', sessionManager.cookieName], ['maximumAge', sessionManager.cookieMaxAge]]]
+                  ]]
+                 ]
+    createConfigObject(self.adminConfig, 'WebModuleConfig', moduleConfig, attributes)
+        
+  def waitForApplicationDistribution(self, application):
+    if application.target.scope.type == Scope.CLUSTER:
+       waitCount = 0
+       ready = self.adminApp.isAppReady(application.name)
+       while ready != 'true' and waitCount < 60:
+         debug('Application not ready - %s' % self.adminApp.getDeployStatus(application.name))
+         debug('Sleeping for 30 seconds waiting for application binary expansion')
+         sleep(30)
+         ready = self.adminApp.isAppReady(application.name)
+       if ready != 'true':
+         raiseError('Error: Application is not ready after 30 minutes')
+       return ready
+
+env.py
+
+from ewad.util import log, debug, raiseError
+from ewad.config import BaseConfigurator
+from ewad.config.finder import  findConfigTarget, findConfigTargetWithScope, findScopeEntry, getId 
+from ewad.config.util import createConfigObject, modifyConfigObject
+from ewad.model.env import Scope
+
+class SecurityDomainConfigurator(BaseConfigurator):
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, securityDomain, resourceOwners):
+    log('Configuring SecurityDomain: ( %s, %s )' % (securityDomain.name, securityDomain.description))
+    # Verify that the SecurityDomain exists
+    securityDomainConfig = findConfigTarget(self.adminConfig, securityDomain.name, 'SecurityDomain')
+    if securityDomainConfig:
+      debug('SecurityDomain %s exists' % securityDomain.name)
+    else:
+      if securityDomain.addMembers:
+        raiseError('SecurityDomain %s does not exist and application requires it.' % securityDomain.name)
+       
+    for resourceOwner in resourceOwners:
+      self.configureMembers(securityDomain, resourceOwner.scope)
+
+    
+  def configureMembers(self, securityDomain, scope):         
+    resourceName = None
+    if scope.type == Scope.CLUSTER:
+      resourceName = 'Cell=:ServerCluster=%s' % scope.name
+    if scope.type == Scope.SERVER:
+      resourceName = 'Cell=:Node=%s:Server=%s' % (scope.node.name, scope.name)
+
+    currentDomain = self.adminTask.getSecurityDomainForResource('-resourceName %s' % resourceName)
+    
+    if securityDomain.addMembers:
+      if currentDomain:
+        debug('remove Resource %s from SecurityDomain %s' % (resourceName, currentDomain))
+        self.adminTask.removeResourceFromSecurityDomain('-securityDomainName %s -resourceName %s' % (currentDomain, resourceName))
+      debug('map Resource %s to SecurityDomain %s' % (resourceName, securityDomain.name))
+      self.adminTask.mapResourceToSecurityDomain('-securityDomainName %s -resourceName %s' % (securityDomain.name, resourceName))
+    else:
+      if currentDomain:
+        debug('remove Resource %s from SecurityDomain %s' % (resourceName, securityDomain.name))
+        self.adminTask.removeResourceFromSecurityDomain('-securityDomainName %s -resourceName %s' % (currentDomain, resourceName))
+    
+class SharedLibraryConfigurator(BaseConfigurator):
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, sharedLibrary):
+    log('Configuring SharedLibrary: ( %s, %s )' % (sharedLibrary.name, sharedLibrary.classpath))
+    scopeEntry = findScopeEntry(self.adminConfig, sharedLibrary.owner.scope)
+    attributes = [['name', sharedLibrary.name],
+                  ['classPath ', sharedLibrary.classpath]]
+    sharedLibraryConfig = getId(self.adminConfig, '/Library:%s/' % sharedLibrary.name)
+    if sharedLibraryConfig:
+      modifyConfigObject(self.adminConfig, 'Library', sharedLibraryConfig, attributes)
+    else:
+      createConfigObject(self.adminConfig, 'Library', scopeEntry, attributes)
+      
+
+class NameSpaceBindingConfigurator(BaseConfigurator):
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+    
+  def configure(self, scope, nameSpaceBinding):
+    log('Configuring NameSpaceBinding: ( %s, %s )' % (nameSpaceBinding.name, nameSpaceBinding.value))
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    
+    attribute_list = [['name', nameSpaceBinding.name], 
+                  ['nameInNameSpace', nameSpaceBinding.name], 
+                  ['stringToBind', nameSpaceBinding.value]]
+
+    attributes = "["
+    for item in attribute_list:
+      attributes += "['" + item[0] + "' '" + item[1] + "']"
+    attributes += "]"
+  
+    bindingConfig = findConfigTargetWithScope(self.adminConfig, scope, nameSpaceBinding.name, 'StringNameSpaceBinding')
+    if bindingConfig:
+      modifyConfigObject(self.adminConfig, 'StringNameSpaceBinding', bindingConfig, attributes)
+    else:
+      createConfigObject(self.adminConfig, 'StringNameSpaceBinding', scopeEntry, attributes)
+
+finder.py
+
+import sys
+from ewad.util import lineSeparator, formatExceptionInfo, raiseError, True, False
+from ewad.model.env import Scope
+from ewad.config.util import wsadminToList
+
+def findCell(adminConfig, cell):
+  return getId(adminConfig, '/Cell:%s/' % cell)
+
+def findNode(adminConfig, nodeName):
+  return getId(adminConfig, '/Node:%s/' % nodeName)
+
+def findConfigTarget(adminConfg, nameSearch, type):
+  elements = adminConfg.list(type)
+  if elements == ' ':
+    return None
+  elementList = elements.split(lineSeparator)
+  for element in elementList:
+    element = element.rstrip()
+    if len(element) > 0:
+      name = adminConfg.showAttribute(element, 'name')
+      if nameSearch == name:
+        return element
+  return None
+
+def findConfigTargetWithScope(adminConfig, scope, nameSearch, type):
+  scopeConfig = findScopeEntry(adminConfig, scope)
+  
+  if scopeConfig == None:
+    return None
+  elements = adminConfig.list(type, scopeConfig)
+  elementList = elements.split(lineSeparator)
+  for element in elementList:
+    element = element.rstrip()
+    if ((element.find(scope.name + '|') >= 0) or (element.find(nameSearch + '|') >= 0)):
+      if (len(element) > 0):
+        name = adminConfig.showAttribute(element, 'name')
+        if (nameSearch == name):
+          return element
+  return None
+
+def findScopeEntry(adminConfig, scope):
+  scopeType = scope.type.lower()
+  if (scopeType == 'cell'):
+    return findCell(adminConfig, scope.name)
+  elif (scopeType == 'node'):
+    return findNode(adminConfig, scope.name)
+  elif (scopeType == 'cluster'):
+    return findServerCluster(adminConfig, scope.name)
+  elif (scopeType == 'server'):
+    return findServerOnNode(adminConfig, scope.name, scope.node.name)
+
+def findServerCluster(adminConfig, clusterName):
+  return getId(adminConfig, '/ServerCluster:%s/' % clusterName) 
+
+def findServerOnNode (adminConfig, serverName, nodeName):
+  return getId(adminConfig, '/Node:%s/Server:%s/' % (nodeName, serverName));
+
+def first(list):
+  retList = wsadminToList(list)
+  return retList[0]
+  
+def getActiveDeploymentManagersList(adminControl):
+  try:
+    return adminControl.queryNames('processType=DeploymentManager,*')
+  except:
+    raiseError('Error getting Deployment Managers list - %s' % formatExceptionInfo())
+  return deploymentMgrsList
+
+def getConfigId(adminConfig, scope, objectType):
+  scopeType = scope.type.title()
+  if scopeType == 'Cell':
+    return getId(adminConfig, '/Cell:%s/%s:/' % (scope.name, objectType))
+  elif scopeType == 'Node':
+    return getId(adminConfig, '/Node:%s/%s:/' % (scope.name, objectType))
+  elif scopeType == 'Cluster':
+    return getId(adminConfig, '/ServerCluster:%s/%s:/' % (scope.name, objectType))
+  elif scopeType == 'Server':
+    lookup = '/Node:%s/Server:%s/%s:/' % (scope.node.name, scope.name, objectType)
+    configId = AdminConfig.getid(lookup)
+    if configId == '':
+      configId = None
+    return configId
+      
+def getConfigItemId(adminConfig, scope, objectType, item):
+  scopeType = scope.type.title()
+  if (scopeType == 'Cell'):
+    return getId(adminConfig, '/Cell:%s/%s:%s' % (scope.name, objectType, item))
+  elif (scopeType == 'Node'):
+    return getId(adminConfig, '/Node:%s/%s:%s' % (scope.name, objectType, item))
+  elif (scopeType == 'Cluster'):
+    return getId(adminConfig, '/ServerCluster:%s/%s:%s' % (scope.name, objectType, item))
+  elif (scopeType == 'Server'):
+    return getId(adminConfig, '/Node:%s/Server:%s/%s:%s' % (scope.node.name, scope.name, objectType, item))
+
+def getId(adminConfig, lookup):
+  configId = adminConfig.getid(lookup)
+  if configId == '':
+    configId = None
+  return configId
+
+def getConfigObject(adminConfig, objectName, objectType):
+  try:
+    return getid(adminConfig, '/%s:%s/' % (objectType, objectName))
+  except:
+    raiseError('Error getting object ID of Config Object - %s' % formatExceptionInfo())
+
+def getConfigObjectScoped(adminConfig, scopeObjectID, objectType):
+  try:
+    return adminConfig.list(objectType, scopeObjectID)
+  except:
+    raiseError('Error getting %s object - %s' % (scopeObjectID, formatExceptionInfo()))
+
+def getAttribute(adminConfig, objectId, attributeName):
+  try:
+    attribute = adminConfig.showAttribute(objectId, attributeName)
+    if attribute == None or attribute == '':
+      return None
+    return attribute
+  except:
+    raiseError('Error getting attribute %s on %s object - %s' % (attributeName, objectId, formatExceptionInfo()))
+
+def findDataSourceWithScope(adminConfig, scope, dataSourceName):
+  return findConfigTargetWithScope(adminConfig, scope, dataSourceName, 'DataSource')
+
+def findJDBCProviderWithScope(adminConfig, scope, name):
+  return findConfigTargetWithScope(adminConfig, scope, name, 'JDBCProvider')
+
+def findJ2CConnectionFactoryWithScope(adminConfig, scope, name):
+  return findConfigTargetWithScope(adminConfig, scope, name, 'J2CConnectionFactory')
+  
+def findJ2CResourceAdapterWithScope(adminConfig, scope, name):
+  return findConfigTargetWithScope(adminConfig, scope, name, 'J2CResourceAdapter')
+
+qnami.py
+
+import sys, java
+from ewad.util import log, debug, raiseError, formatExceptionInfo, True, False
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject
+class QnamiConfigurator(BaseConfigurator):
+  '''
+    Used to configure QNAMI! mbean
+  '''
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, qnamiOptions ):
+    found = 0
+    enableQnami = qnamiOptions[0]
+    jvm_name = qnamiOptions[1]
+    qnamiId = qnamiOptions[2]
+    lineSeparator = java.lang.System.getProperty('line.separator')
+    servers = self.adminConfig.getid('/Server:/')
+    serversList = servers.split(lineSeparator)
+    for server in serversList:
+      jname = self.adminConfig.showAttribute(server, "name")
+      if jname == jvm_name:
+        jcs = self.adminConfig.list("CustomService", server)
+        jvm = self.adminConfig.list("JavaVirtualMachine", server)
+        if enableQnami == 'true':
+          log('QNAMI is enabled for %s' % jvm_name)
+          if len(jcs) <= 0:
+            cust_prop = [['enable','true'],['classname','com.mqsoftware.BTM.mbean.startup.was.WASCustomService'],['displayName','BTM for WAS Startup'],['classpath','/trvapps/bmc/qnami/mbeanjars']]
+            userId = AdminConfig.list("UserExt" )
+    	    for user in userId.split("\n"):
+               if qnamiId.find(user) == 0:
+                  found = 0
+               else:
+                  log('bmcmon id is already added to the cell')
+                  found = 1
+            if not found:
+               log('Adding bmcmon id to the cell')
+               self.adminTask.mapUsersToAdminRole(['-authorizationGroupName', 'CellAuthorizationGroup', '-roleName', 'operator', '-userids', qnamiId])
+            createConfigObject(self.adminConfig, 'CustomService', server, cust_prop)
+        else:
+          log('QNAMI is disabled for %s' % jvm_name)
+          if len(jcs) > 0:
+	          self.adminConfig.remove(jcs)
+
+
+security.py
+
+from ewad.util import log, debug, False, lineSeparator
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, modifyConfigObject, wsadminToList
+from ewad.config.finder import getId, getAttribute
+
+class AuthAliasConfigurator(BaseConfigurator):
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, authenticationAlias):
+    log('Configuring JAAS Auth Alias: ( %s, %s, %s )' % (authenticationAlias.name, authenticationAlias.user, authenticationAlias.description))
+    attributes = [['alias', authenticationAlias.name],
+                  ['userId', authenticationAlias.user],
+                  ['password', authenticationAlias.password],
+                  ['description', authenticationAlias.description]]
+
+    jaasAliases = wsadminToList(self.adminConfig.list('JAASAuthData'))
+    if jaasAliases:
+      for jaasAlias in jaasAliases:
+        if getAttribute(self.adminConfig, jaasAlias, 'alias') == authenticationAlias.name:
+          debug('Authentication Alias exists, updating')  
+          modifyConfigObject(self.adminConfig, 'JAASAuthData', jaasAlias, attributes, False)
+          return
+    debug('Authentication Alias does not exist, creating')
+    security = getId(self.adminConfig, '/Cell:%s/Security:/' % authenticationAlias.cell.name)
+    createConfigObject(self.adminConfig, 'JAASAuthData', security, attributes, False)
+
+
+
+
+class CoreGroupConfigurator(BaseConfigurator):
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, coreGroup):
+    log('Configuring CoreGroup: ( %s)' % (coreGroup.name))
+    cust_prop = []
+    for attr in coreGroup.customproperties:
+       cust_prop.append([["name",attr[0]],["value",attr[1]]])
+    
+    coreGroup_status = self.adminTask.doesCoreGroupExist(['-coreGroupName', coreGroup.name])
+    if coreGroup_status == "false":
+       self.adminTask.createCoreGroup(['-coreGroupName', coreGroup.name])
+       coreGroupId = getId(self.adminConfig, '/CoreGroup:%s/' % coreGroup.name)
+       modifyConfigObject(self.adminConfig,'CoreGroup',coreGroupId, [['customProperties', cust_prop]])
+    else:
+       log('The coregroup already exists: ( %s)' % (coreGroup.name))
+       coreGroupId = getId(self.adminConfig, '/CoreGroup:%s/' % coreGroup.name)
+       currentCoreGroupProps = wsadminToList(self.adminConfig.showAttribute(coreGroupId, 'customProperties'))
+       for current_prop in currentCoreGroupProps:
+          self.adminConfig.remove(current_prop)
+       modifyConfigObject(self.adminConfig,'CoreGroup',coreGroupId, [['customProperties', cust_prop]])
+     
+
+server.py
+
+import sys
+from ewad.util import log, debug, raiseError, formatExceptionInfo, True, False
+from ewad.config import BaseConfigurator
+from ewad.config.finder import findCell, findServerCluster, findServerOnNode, findNode, getConfigObjectScoped, findConfigTargetWithScope, getAttribute
+from ewad.config.resource import ResourceConfigurator
+from ewad.config.util import createConfigObject, modifyConfigObject, removeConfigObject, wsadminToList
+
+class ClusterConfigurator(BaseConfigurator):
+  '''
+    Used to create and configure clusters
+  '''
+  
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def configure(self, cluster, createCluster=True, createMembers=True, configureMembers=True, configureResources=True):
+    if createCluster:
+      if cluster.recreate:
+        self.delete(cluster)
+      self.create(cluster)
+      
+    self.reconcileMembers(cluster)
+    if createMembers:
+      for member in cluster.members:
+        self.createClusterMember(cluster, member)
+    
+    
+    if configureMembers:
+      serverConfigurator = ServerConfigurator(self.adminConfig, self.adminTask)
+      for member in cluster.members:
+        serverConfigurator.configure(member, False)
+    
+    self.configureCoreGroup(cluster)
+        
+    if configureResources:
+      resourceConfigurator = ResourceConfigurator(self.adminConfig, self.adminTask)
+      resourceConfigurator.configure(cluster)
+    
+  def create(self, cluster):
+    log('Creating cluster ( %s )' % cluster.name)
+    clusterConfig = findServerCluster(self.adminConfig, cluster.name)
+    if clusterConfig:
+      debug('Cluster already exists, so no cluster will be created')
+    else:
+      cellConfig = findCell(self.adminConfig, cluster.cell.name)
+      if not cellConfig:
+        raiseError('Cell %s does not exist.' % cluster.cell.name)
+      createConfigObject(self.adminConfig, 'ServerCluster', cellConfig, [['name', cluster.name], ['preferLocal', 'true']])
+      if cluster.replication:
+        self.createClusterReplicationDomain(cluster, cellConfig)
+      log('Cluster %s created successfully' % cluster.name)
+    
+  def delete(self, cluster):
+    clusterConfig = findServerCluster(self.adminConfig, cluster.name)
+    if clusterConfig:
+      log('Deleting cluster ( %s )' % cluster.name)
+      removeConfigObject(self.adminConfig, 'ServerCluster', clusterConfig)
+
+  def reconcileMembers(self, cluster):
+    clusterConfig = findServerCluster(self.adminConfig, cluster.name)
+    members = wsadminToList(getAttribute(self.adminConfig, clusterConfig, 'members'))
+    for memberConfig in members:
+      memberName = getAttribute(self.adminConfig, memberConfig, 'memberName')
+      nodeName = getAttribute(self.adminConfig, memberConfig, 'nodeName')
+      found = False
+      for member in cluster.members:
+        if member.name == memberName and member.node.name == nodeName:
+          found = True
+      if not found:
+        debug('Deleting cluster member %s:%s from cluster %s' % (nodeName, memberName, cluster.name))
+        self.adminConfig.remove(memberConfig)
+    
+  def createClusterReplicationDomain(self, cluster, cellConfig):
+     createConfigObject(self.adminConfig, 'DataReplicationDomain', cellConfig, [
+        ['name', cluster.name],
+        ['defaultDataReplicationSettings', [['requestTimeout', "5"], ['encryptionType', 'NONE']]]  
+      ])
+  
+  def createClusterMember(self, cluster, clusterMember):
+    log('Creating cluster member ( %s, %s, %s, %s )' % (clusterMember.name, cluster.name, clusterMember.node.name, clusterMember.nodeWeight))
+    serverConfig = findServerOnNode(self.adminConfig, clusterMember.name, clusterMember.node.name)
+    if serverConfig:
+      debug('server %s already exists' % clusterMember.name)
+      return
+    clusterConfig = findServerCluster(self.adminConfig, cluster.name)
+    if not clusterConfig:
+      raiseError('Cluster %s does not exist.' % cluster.name)
+    nodeConfig = findNode(self.adminConfig, clusterMember.node.name)
+    if not nodeConfig:
+      raiseError('Node does not exist')
+    clusterTemplate = self.adminConfig.listTemplates('ClusterMember')
+    try:
+      server = self.adminConfig.createClusterMember(clusterConfig, nodeConfig, [['memberName', clusterMember.name], ['weight', clusterMember.nodeWeight]], clusterTemplate)
+    except:
+      raiseError('Caught Exception creating cluster member - %s' % formatExceptionInfo())
+    log('Cluster member %s created successfully' % clusterMember.name)
+
+  def configureCoreGroup(self, cluster):
+    if len(cluster.members) > 0:
+      member = cluster.members[0]
+      currentGroup = self.adminTask.getCoreGroupNameForServer(['-nodeName', member.node.name, '-serverName', member.name])
+      if member.haManager.coreGroup != currentGroup:
+        log('Moving cluster from %s to %s' % (currentGroup, member.haManager.coreGroup))
+        self.adminTask.moveClusterToCoreGroup(['-source', currentGroup, '-target', member.haManager.coreGroup, '-clusterName', cluster.name])
+
+class ServerConfigurator(BaseConfigurator):
+  '''
+    Used to create and configure servers
+  '''
+
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+  
+  def createServer(self, server):
+    log('Create app server %s if it does not exist' % server.name)
+    node = findNode(self.adminConfig, server.node.name)
+    if node == None:
+      raiseError('Node %s does not exist' % server.node.name)
+    serverConfig = findServerOnNode(self.adminConfig, server.name, server.node.name)
+    if serverConfig:
+      log('Server %s already exists' % server.name)
+      return
+
+    server = createConfigObject(self.adminConfig, 'Server', node, [['name', server.name]])
+  
+  def configure(self, server, createServer=True, configureResources=True):
+    if createServer:
+      self.createServer(server)
+    log('Configuring server %s' % server.name)
+    serverConfig = findServerOnNode(self.adminConfig, server.name, server.node.name)
+    applicationServer = getConfigObjectScoped(self.adminConfig, serverConfig, 'ApplicationServer')
+
+    attributes = [['applicationClassLoadingMode', server.classloadingMode],
+                  ['applicationClassLoaderPolicy', server.classloadingPolicy],
+                  ['stateManagement', [['initialState', server.initialState]]]]
+    modifyConfigObject(self.adminConfig, 'ApplicationServer', applicationServer, attributes)
+
+    self.configureJavaVirtualMachine(server.javaVirtualMachine, serverConfig)
+    self.configureSessionManager(server.sessionManager, serverConfig)
+    if server.name != "server1":
+       self.configureEndpoints(server)
+    if server.transactionService:
+       self.configureTransactionService(server.transactionService, serverConfig)
+    if server.webContainer:
+       self.configureWebContainer(server.webContainer, serverConfig)
+    self.configureEjbContainer(server.ejbContainer, serverConfig)
+    self.configureObjectRequestBroker(server.objectRequestBroker, serverConfig)
+    self.configureHaManager(server, server.haManager, serverConfig)
+    self.configureLogger(server.systemOutConfig, serverConfig)
+    self.configureLogger(server.systemErrConfig, serverConfig)
+    self.configureThreadPool(server.defaultThreadPool, self.findThreadPool(server.defaultThreadPool, serverConfig))
+    self.configureListenerPorts(server, serverConfig)
+    self.configureTraces(server, serverConfig)
+    if server.hostNameIncludeList:
+       self.configureHostIncludeList(server.hostNameIncludeList, serverConfig)
+    if configureResources:
+      resourceConfigurator = ResourceConfigurator(self.adminConfig, self.adminTask)
+      resourceConfigurator.configure(server)
+    
+  def configureJavaVirtualMachine(self, javaVirtualMachine, serverConfig):
+    javaProcessDefId = getConfigObjectScoped(self.adminConfig, serverConfig, 'JavaProcessDef')
+    jvm = getConfigObjectScoped(self.adminConfig, serverConfig, 'JavaVirtualMachine')
+        
+    attributes = [['initialHeapSize', javaVirtualMachine.minHeap],
+                  ['maximumHeapSize', javaVirtualMachine.maxHeap],
+                  ['classpath', javaVirtualMachine.classpath],
+                  ['genericJvmArguments', javaVirtualMachine.jvmArguments],
+                  ['debugMode', javaVirtualMachine.jvmDebugMode],
+                  ['debugArgs', javaVirtualMachine.debugArguments],
+                  ['verboseModeGarbageCollection', javaVirtualMachine.verboseGC]]
+    
+    modifyConfigObject(self.adminConfig, 'JavaVirtualMachine', jvm, '[[classpath " "]]')
+    modifyConfigObject(self.adminConfig, 'JavaVirtualMachine', jvm, attributes)
+
+    environment = wsadminToList(getAttribute(self.adminConfig, javaProcessDefId, 'environment'))
+    for environmentId in environment:
+      self.adminConfig.remove(environmentId)
+    javaVirtualMachine.environment.append([['name','IBM_HEAP_DUMP'],['value','true']])
+    javaVirtualMachine.environment.append([['name','IBM_HEAPDUMP_OUTOFMEMORY'],['value','true']])
+    modifyConfigObject(self.adminConfig, 'JavaProcessDef', javaProcessDefId, [['environment', javaVirtualMachine.environment]])
+
+    systemProperties = wsadminToList(getAttribute(self.adminConfig, jvm, 'systemProperties'))
+    for systemProperty in systemProperties:
+      self.adminConfig.remove(systemProperty)
+    javaVirtualMachine.systemProperties.append([['name','sun.net.inetaddr.ttl'],['value','30']])
+    modifyConfigObject(self.adminConfig, 'JavaVirtualMachine', jvm, [['systemProperties', javaVirtualMachine.systemProperties]])
+      
+  def configureSessionManager(self, sessionManager, serverConfig):
+    sessionManagerConfig = self.adminConfig.list('SessionManager', serverConfig)
+    tuningParams = getAttribute(self.adminConfig, sessionManagerConfig, 'tuningParams')
+    if sessionManager.sessionTrackingOption == "URLREWRITE":
+       session_attributes = [['enableUrlRewriting','true'],
+                             ['enableCookies', 'false']]
+    if sessionManager.sessionTrackingOption == "COOKIE":
+       session_attributes = [['enableUrlRewriting','false'],
+                             ['enableCookies', 'true']]
+    modifyConfigObject(self.adminConfig, 'SessionManager', sessionManagerConfig, session_attributes)
+    modifyConfigObject(self.adminConfig, 'SessionManager', tuningParams, [
+      ['maxInMemorySessionCount', sessionManager.maxInMemorySessionCount],
+      ['invalidationTimeout', sessionManager.invalidationTimeout]])
+    cookie = getAttribute(self.adminConfig, sessionManagerConfig, 'defaultCookieSettings')
+    if sessionManager.sessionTrackingOption == "COOKIE":
+       modifyConfigObject(self.adminConfig, 'SessionManager.cookie', cookie, [['name', sessionManager.cookieName]])
+
+
+  def configureEndpoints(self, server):
+    endpoints = {'BOOTSTRAP_ADDRESS': '11%s' % server.portSeed,
+                 'CSIV2_SSL_MUTUALAUTH_LISTENER_ADDRESS': '12%s' % server.portSeed,
+                 'CSIV2_SSL_SERVERAUTH_LISTENER_ADDRESS': '13%s' % server.portSeed,
+                 'ORB_LISTENER_ADDRESS': '17%s' % server.portSeed,
+                 'SAS_SSL_SERVERAUTH_LISTENER_ADDRESS': '18%s' % server.portSeed,
+                 'SOAP_CONNECTOR_ADDRESS': '19%s' % server.portSeed,
+                 'DCS_UNICAST_ADDRESS': '20%s' % server.portSeed,
+                 'SIB_ENDPOINT_ADDRESS': '21%s' % server.portSeed,
+                 'SIB_ENDPOINT_SECURE_ADDRESS': '22%s' % server.portSeed,
+                 'SIB_MQ_ENDPOINT_ADDRESS': '23%s' % server.portSeed,
+                 'SIB_MQ_ENDPOINT_SECURE_ADDRESS': '24%s' % server.portSeed,
+                 'WC_defaulthost': '25%s' % server.portSeed,
+                 'WC_defaulthost_secure': '26%s' % server.portSeed,
+                 'WC_adminhost': '27%s' % server.portSeed,
+                 'WC_adminhost_secure': '28%s' % server.portSeed,
+                 'SIP_DEFAULTHOST': '29%s' % server.portSeed,
+                 'SIP_DEFAULTHOST_SECURE': '30%s' % server.portSeed,
+                 'IPC_CONNECTOR_ADDRESS': '31%s' % server.portSeed}
+    try:
+      for endpointName, port in endpoints.items():
+        self.adminTask.modifyServerPort(server.name, ['-nodeName', server.node.name, '-endPointName', endpointName, '-port', port, '-modifyShared', 'true'])
+    except:
+      raiseError('Caught Exception updating endpoints - %s' % formatExceptionInfo())
+    debug('Modified ServerEnpoints with attributes %s' % endpoints)
+    
+  def configureWebContainer(self, webContainer, serverConfig):
+    webContainerConfig = getConfigObjectScoped(self.adminConfig, serverConfig, 'WebContainer')
+    #modifyConfigObject(self.adminConfig, 'WebContainer', webContainerConfig, [
+    #         ['enableServletCaching', webContainer.enableServletCaching], 
+    #         ['stateManagement', [['initialState', webContainer.initialState]]]
+    #])
+#    stateManagement = self.adminConfig.showAttribute(webContainerConfig, 'stateManagement')
+#    modifyConfigObject(self.adminConfig, 'WebContainer', stateManagement, [["initialState", webContainer.initialState]])
+    wcCustProp = self.adminConfig.list('Property', webContainerConfig)
+    sts = "false"
+    create_sts = "false"
+    if len(webContainer.properties) != 2:
+       print "  "
+    else:
+       create_sts = "true"
+       for prop in wcCustProp.splitlines(): 
+          for prop_mira in webContainer.properties:
+             wcCustProp_check = wcCustProp.split("(")
+             if wcCustProp_check[0] == prop_mira[1]:
+                sts = "true"
+             else:
+                continue
+    if create_sts == "true":
+       if sts == "false":
+          log('Configuring httpsIndicator webcontainer property')
+          createConfigObject(self.adminConfig, 'Property', webContainerConfig, webContainer.properties)
+       else:
+          print " "
+    else:
+       webContainer.properties = [['name', 'HttpsIndicatorHeader'],['value', 'HOST']]
+       wcCustProp = self.adminConfig.list('Property', webContainerConfig)
+       for wc_prop in wcCustProp.splitlines():
+          wcCustProp_check = wc_prop.split("(")
+          if wcCustProp_check[0] == "HttpsIndicatorHeader":
+             self.adminConfig.remove(wc_prop)
+             log('httpsIndicator webcontainer property removed')
+    #sessionManager = self.adminConfig.list('SessionManager', webContainerConfig)
+    #tuningParams = self.adminConfig.showAttribute(sessionManager, 'tuningParams')
+    #modifyConfigObject(self.adminConfig, 'WebContainer.SessionManager', tuningParams, [["invalidationTimeout", webContainer.sessionTimeout]])
+    #self.configureThreadPool(webContainer.threadPool, self.findThreadPool(webContainer.threadPool, serverConfig))
+    
+  def configureEjbContainer(self, ejbContainer, serverConfig):
+    ejbContainerConfig = getConfigObjectScoped(self.adminConfig, serverConfig, 'EJBContainer')
+    modifyConfigObject(self.adminConfig, 'EJBContainer', ejbContainerConfig, [['stateManagement', [["initialState", ejbContainer.initialState]]]])
+  
+  def configureObjectRequestBroker(self, objectRequestBroker, serverConfig):
+    orb = getConfigObjectScoped(self.adminConfig, serverConfig, 'ObjectRequestBroker')
+    modifyConfigObject(self.adminConfig, 'ObjectRequestBroker', orb, [
+             ['noLocalCopies', objectRequestBroker.noLocalCopies], 
+             ['requestTimeout', objectRequestBroker.requestTimeout]
+    ])
+    self.configureThreadPool(objectRequestBroker.threadPool, self.findThreadPool(objectRequestBroker.threadPool, serverConfig))
+  
+  def findThreadPool(self, threadPool, serverConfig):
+    threadPoolManager = getConfigObjectScoped(self.adminConfig, serverConfig, 'ThreadPoolManager')
+    threadPools = wsadminToList(getAttribute(self.adminConfig, threadPoolManager, 'threadPools'))
+    for threadPoolConfig in threadPools:
+      if threadPoolConfig.find(threadPool.name) >= 0:
+        return threadPoolConfig  
+  
+  def configureThreadPool(self, threadPool, threadPoolConfig):
+    modifyConfigObject(self.adminConfig, 'ThreadPool.%s' % threadPool.name, threadPoolConfig, [
+             ["minimumSize", threadPool.threadPoolMin],
+             ['maximumSize', threadPool.threadPoolMax],
+             ['isGrowable', threadPool.threadPoolGrowable]
+    ])
+  
+  def configureHaManager(self, server, haManager, serverConfig):
+    log('Configuring HA Service')
+    haManagerConfig = getConfigObjectScoped(self.adminConfig, serverConfig, 'HAManagerService')
+    modifyConfigObject(self.adminConfig, 'HAManagerService', haManagerConfig, [
+             ['enable', haManager.enabled],
+             ['transportBufferSize', haManager.transportBufferSize]
+    ])
+    #threadPool = getConfigObjectScoped(self.adminConfig, haManagerConfig, 'ThreadPool')
+    #self.configureThreadPool(haManager.threadPool, threadPool)
+  
+  def configureLogger(self, loggingConfig, serverConfig):
+    log('Configuring JVM logging properties')
+    streamRedirectory = getAttribute(self.adminConfig, serverConfig, loggingConfig.redirectName)
+    modifyConfigObject(self.adminConfig, 'Logger.%s' % loggingConfig.redirectName, streamRedirectory, [
+             ['maxNumberOfBackupFiles', loggingConfig.maxBackups],
+             ['rolloverSize', loggingConfig.rolloverSize]
+    ])
+  
+  def configureHostIncludeList(self, serverlist, serverConfig):
+    log('Configuring Host Name Include List')
+    transportChannelService = getConfigObjectScoped(self.adminConfig, serverConfig, 'TransportChannelService')
+    tcpInboundChannelList =   wsadminToList(getConfigObjectScoped(self.adminConfig, serverConfig, 'TCPInboundChannel'))
+    for tport in tcpInboundChannelList:
+       endPointName = getAttribute(self.adminConfig, tport, 'endPointName')
+       if (endPointName == "WC_defaulthost"):
+          for hostName in serverlist:
+             modifyConfigObject(self.adminConfig, 'TCPInboundChannel', tport, [['hostNameIncludeList', hostName]])
+
+  def configureTransactionService(self, transactionService, serverConfig):
+    transactionServiceConfig = getConfigObjectScoped(self.adminConfig, serverConfig, 'TransactionService')
+    attributes = []
+    if transactionService.totalTranLifetimeTimeout:
+       attributes.append(['totalTranLifetimeTimeout', transactionService.totalTranLifetimeTimeout])
+    if transactionService.propogatedOrBMTTranLifetimeTimeout:
+       attributes.append(['propogatedOrBMTTranLifetimeTimeout', transactionService.propogatedOrBMTTranLifetimeTimeout])
+    if transactionService.clientInactivityTimeout:
+       attributes.append(['clientInactivityTimeout', transactionService.clientInactivityTimeout])
+    if transactionService.transactionLogDirectory:
+       attributes.append(['transactionLogDirectory', transactionService.transactionLogDirectory]) 
+
+    if len(attributes) > 0:
+       modifyConfigObject(self.adminConfig, 'TransactionService', transactionServiceConfig, attributes)
+
+  def configureListenerPorts(self, server, serverConfig):
+    for listenerPort in server.listenerPorts:
+      self.configureListenerPort(server, listenerPort, serverConfig)
+  
+  def configureTraces(self, server, serverConfig):
+    trace_string=""
+    for trace in server.traces:
+      tr_string = self.configureTrace(server, trace, serverConfig)
+      trace_string += tr_string
+      #trace_string = tr_string.join(":")
+      self.configureTr(server, trace_string, serverConfig)
+   
+
+  def configureTrace(self, server, trace, serverConfig):
+     log('Configure Trace Settings')
+     trace_list = []
+     tr_string2 = trace.startupTraceSpecification +"="+trace.traceLevel 
+     tr_string2 += ":" 
+     return tr_string2
+     
+  def configureTr(self, server, trace_string, serverConfig):
+     trace_string = trace_string[:-1]
+     traceService = getConfigObjectScoped(self.adminConfig, serverConfig, 'TraceService')
+     modifyConfigObject(self.adminConfig, 'TraceService', traceService, [['startupTraceSpecification', trace_string]])
+        
+  def configureListenerPort(self, server, listenerPort, serverConfig):
+    log('Configuring ListenerPort ( %s, %s, %s )' % (listenerPort.name, listenerPort.connectionFactoryJndi, listenerPort.destinationJndi))
+  
+    messageListenerService = getConfigObjectScoped(self.adminConfig, serverConfig, 'MessageListenerService')
+    if not messageListenerService:
+      raiseError('Could not find the Message Listener Service')
+    
+    properties = wsadminToList(self.adminConfig.list('Property', messageListenerService))
+    for aProperty in properties:
+      if len(aProperty) > 0:
+        name = getAttribute(self.adminConfig, aProperty, 'name')
+        if name == 'MAX.RECOVERY.RETRIES' or name == 'RECOVERY.RETRY.INTERVAL':
+          self.adminConfig.remove(aProperty)          
+    createConfigObject(self.adminConfig, 'Property', messageListenerService, [['name', 'MAX.RECOVERY.RETRIES'], ['value', '14400'], ['description', 'Retry for 24 hours'], ['required', 'false']])
+    createConfigObject(self.adminConfig, 'Property', messageListenerService, [['name', 'RECOVERY.RETRY.INTERVAL'], ['value', '10'], ['description', 'Retry every 10 Seconds'], ['required', 'false']])
+    
+    attributes = [['name', listenerPort.name],
+                  ['description', listenerPort.description],
+                  ['connectionFactoryJNDIName', listenerPort.connectionFactoryJndi],
+                  ['destinationJNDIName', listenerPort.destinationJndi],
+                  ['maxSessions', listenerPort.maxSessions],
+                  ['maxRetries', listenerPort.maxRetries],
+                  ['maxMessages', listenerPort.maxMessages],
+                  ['stateManagement', [['initialState', listenerPort.initialState]]]]
+    
+    listenerPortConfig = findConfigTargetWithScope(self.adminConfig, server.scope, listenerPort.name, 'ListenerPort')
+    if listenerPortConfig:
+      debug('ListenerPort exists, updating')
+      modifyConfigObject(self.adminConfig, 'ListenerPort', listenerPortConfig, attributes)
+    else:
+      debug('ListenerPort does not exist, creating')
+      createConfigObject(self.adminConfig, 'ListenerPort', messageListenerService, attributes)
+
+  def toggleService(self, server, serviceName, flag):
+    serverConfig = findServerOnNode(self.adminConfig, server.name, server.node.name)
+    service = self.adminConfig.list('"%s"' % serviceName, serverConfig)
+    modifyConfigObject(self.adminConfig, 'Service.%s' % serviceName, service, [["enable", flag]] )
+
+
+util.py
+
+from ewad.util import debug, raiseError, formatExceptionInfo, True, lineSeparator
+
+def createConfigObject(adminConfig, type, parent, attributes, printDebug=True):
+  try:
+    configObject = adminConfig.create(type, parent, attributes)
+    if printDebug:
+      debug('Created %s with attributes %s' % (type, attributes))
+    return configObject
+  except:
+    raiseError('Caught Exception creating %s - %s' % (type, formatExceptionInfo()))
+    
+def createConfigObjectWithParentName(adminConfig, type, parent, attributes, parentAttributeName, printDebug=True):
+  try:
+    configObject = adminConfig.create(type, parent, attributes, parentAttributeName)
+    if printDebug:
+      debug('Created %s with attributes %s' % (type, attributes))
+    return configObject
+  except:
+    raiseError('Caught Exception creating %s - %s' % (type, formatExceptionInfo()))
+    
+def modifyConfigObject(adminConfig, type, configObject, attributes, printDebug=True):
+  try:
+    adminConfig.modify(configObject, attributes)
+    if printDebug:
+      debug('Modified %s with attributes %s' % (type, attributes))
+  except:
+    raiseError('Caught Exception modifying %s - %s' % (type, formatExceptionInfo()))
+
+def removeConfigObject(adminConfig, type, configObject, attributes=None, printDebug=True):
+  try:
+    adminConfig.remove(configObject)
+    if printDebug:
+      debug('Removed %s' % (type))
+  except:
+    raiseError('Caught Exception removing %s - %s' % (type, formatExceptionInfo()))
+    
+def wsadminToList(inStr):
+  outList = []
+  if len(inStr) > 0 and inStr[0] == '[' and inStr[ - 1] == ']':
+    inStr = inStr[1: - 1]
+    tmpList = inStr.split(' ')
+  else:
+    tmpList = inStr.split(lineSeparator)
+  for item in tmpList:
+    item = item.rstrip()
+    if len(item) > 0 :
+      outList.append(item)
+  return outList
+  
+virtualhost.py
+
+from ewad.util import log, debug, False, lineSeparator
+from ewad.config import BaseConfigurator
+from ewad.config.util import createConfigObject, modifyConfigObject, wsadminToList
+from ewad.config.finder import getId, getAttribute, findCell, getConfigObjectScoped, getAttribute
+
+class VirtualHostConfigurator(BaseConfigurator):
+
+  def __init__(self, adminConfig, adminTask):
+    BaseConfigurator.__init__(self, adminConfig, adminTask)
+
+  def configure(self, virtualHost):
+    found = 0
+    log('Configuring VirtualHost: ( %s)' % (virtualHost.name))
+    cellConfig = findCell(self.adminConfig, virtualHost.cell.name)
+    virtualHostConfig = getId(self.adminConfig, '/VirtualHost:%s/' % virtualHost.name)
+    if not virtualHostConfig:
+      virtualHostConfig = createConfigObject(self.adminConfig, 'VirtualHost', cellConfig, [['name', virtualHost.name]])
+
+    aliasList = self.adminConfig.list('HostAlias', virtualHostConfig)
+    for vhalias in virtualHost.aliases:
+       present = 0
+       for alias in aliasList.split(lineSeparator):
+          if (alias != ""):
+             aliasHostName = getAttribute(self.adminConfig, alias, 'hostname')
+             aliasPort = getAttribute(self.adminConfig, alias, 'port')
+             if aliasHostName == vhalias.hostname:
+                if aliasPort == vhalias.port:
+                   present = 1
+
+
+       if not present:
+          log('Configuring VirtualHostAlias  ( %s )' % (vhalias.hostname))
+          createConfigObject(self.adminConfig, 'HostAlias', virtualHostConfig, [['hostname', vhalias.hostname], ['port',  vhalias.port]])
+
+		  
+	
+control
+
+__init__.py
+
+
+class BaseController:
+  '''
+    Base Controller to hold onto the AdminControl object
+  '''
+
+  def __init__(self, adminControl, adminConfig):
+    self.adminControl = adminControl
+    self.adminConfig = adminConfig
+	
+application.py
+
+from ewad.control import BaseController
+from ewad.util import log, debug, raiseError, formatExceptionInfo, False
+from ewad.config.finder import getId
+
+class ApplicationController(BaseController):
+  
+  def __init__(self, adminControl, adminConfig):
+    BaseController.__init__(self, adminControl, adminConfig)
+  
+  def start(self, application, forceStop=False):
+    log('Starting Application ( %s )' % application.name)
+    if self.isRunning(application):
+      debug('Application is already running')
+      if forceStop:
+        debug('Forcing Application stop')
+        self.invokeCommand(application, 'stopApplication')
+      else:
+        return
+    self.invokeCommand(application, 'startApplication')
+    debug('Start Application %s was successful.' % application.name)
+
+  def stop(self, application):
+    log('Stopping Application ( %s )' % application.name)
+    if not self.isRunning(application):
+      debug('Application is not running, no stop will be performed')
+      return 
+    self.invokeCommand(application, 'stopApplication')
+    debug('Stop Application %s was successful.' % application.name)
+
+  def invokeCommand(self, application, command):
+    if not self.applicationExists(application):
+      raiseError('Application %s does not exist.' % application.Name)
+    try:
+      applicationManager = self.adminControl.completeObjectName('type=ApplicationManager,*')
+      self.adminControl.invoke(applicationManager, command, application.name)
+    except:
+      raiseError('Error with %s %s - %s' % (command, application.name, formatExceptionInfo()))
+      
+  def applicationExists(self, application):
+    return getId(self.adminConfig, '/Deployment:%s/' % application.name) != None
+  
+  def isRunning(self, application):
+    applicationMBean = self.adminControl.completeObjectName('type=Application,name=%s,*' % application.name)
+    return len(applicationMBean) > 0
+
+node.py
+
+from ewad.control import BaseController
+from ewad.util import log, debug, raiseError, formatExceptionInfo, False
+from ewad.config.finder import getId
+
+class NodeController(BaseController):
+    
+  def __init__(self, adminControl, adminConfig):
+    BaseController.__init__(self, adminControl, adminConfig)
+
+  def syncAll(self, nodes):
+    for node in nodes:
+      self.sync(node)
+    
+  def sync(self, node):
+    log('Syncing node ( %s )' % node.name)
+  
+    repos = self.adminControl.completeObjectName('type=ConfigRepository,process=dmgr,*')
+    self.adminControl.invoke(repos, 'refreshRepositoryEpoch')
+  
+    nodeSync = self.adminControl.completeObjectName('type=NodeSync,node=%s,*' % node.name)
+    if len(nodeSync) == 0:
+      raiseError('Unable to Synchronize node %s.  The NodeAgent is most likely not running.' % node.name)
+    try:
+      self.adminControl.invoke(nodeSync, 'sync')
+      debug('Node %s was synced successful.' % node.name)
+    except:
+      raiseError('Error synchronization with node - %s' % formatExceptionInfo())
+    
+
+server.py
+
+from ewad.control import BaseController
+from ewad.util import lineSeparator, log, debug, raiseError, formatExceptionInfo, False
+from ewad.config.finder import findScopeEntry, findServerCluster, findServerOnNode
+from ewad.model.env import Cell, Node, Scope
+from ewad.model.server import ClusterMember
+
+class ClusterController(BaseController):
+  
+  def __init__(self, adminControl, adminConfig):
+    BaseController.__init__(self, adminControl, adminConfig)
+    
+  def start(self, cluster):
+    log('Starting Cluster: ( %s )' % cluster.name)
+    serverController = ServerController(self.adminControl, self.adminConfig)
+    serverController.startAll(self.findClusterMemberInScope(cluster.scope))
+    
+  def startAll(self, clusters):
+    for cluster in clusters:
+      self.start(cluster)
+
+  def stop(self, cluster):
+    log('Stopping Cluster: ( %s )' % cluster.name)
+    serverController = ServerController(self.adminControl, self.adminConfig)
+    serverController.stopAll(self.findClusterMemberInScope(cluster.scope))
+
+  def stopAll(self, clusters):
+    for cluster in clusters:
+      self.stop(cluster)
+
+  def findClusterMemberInScope(self, scope):
+    '''
+      This method returns shallow ClusterMember objects for the purpose of stop/start only
+    '''
+    clusterMembers = []
+    cellName = self.adminControl.getCell()
+    scopeEntry = findScopeEntry(self.adminConfig, scope)
+    if scopeEntry:
+      if scope.type == Scope.CLUSTER:
+        elements = self.adminConfig.list('ClusterMember', scopeEntry)
+        elementList = elements.split(lineSeparator)
+        for element in elementList:
+          element = element.rstrip()
+          memberName = self.adminConfig.showAttribute(element, 'memberName')
+          nodeName = self.adminConfig.showAttribute(element, 'nodeName')
+          clusterMembers.append(ClusterMember(Cell(cellName), Node(nodeName), memberName, None))
+    return clusterMembers
+
+
+class ServerController(BaseController):
+  
+  def __init__(self, adminControl, adminConfig):
+    BaseController.__init__(self, adminControl, adminConfig)
+  
+  def start(self, server, forceStop=False):
+    log('Starting Server ( %s, %s )' % (server.node.name, server.name))
+    if findServerOnNode(self.adminConfig, server.name, server.node.name):
+      serverObjectName = self.adminControl.completeObjectName('type=Server,node=%s,name=%s,*' % (server.node.name, server.name))
+      if len(serverObjectName) > 0:
+        serverState = self.adminControl.getAttribute(serverObjectName, 'state')
+        debug('%s current state is %s' % (server.name, serverState))
+        if serverState == 'STARTED':
+          debug('Warn: Server %s is already running on node %s' % (server.name, server.node.name))
+          if forceStop:
+            debug('Forcing Server stop')
+            try:
+              self.adminControl.stopServer(server.name, server.node.name)
+            except:
+              raiseError('Caught Exception force stopping server %s -  %s' % (server.name, formatExceptionInfo()))
+          else:
+            return
+      try:
+        self.adminControl.startServer(server.name, server.node.name)
+      except:
+        raiseError('Caught Exception starting server %s -  %s' % (server.name, formatExceptionInfo()))
+    else: 
+     raiseError('Server %s on Node %s does not exist.' % (server.name, server.node.name))
+
+  def startAll(self, servers):
+    for server in servers:
+      self.start(server)
+
+  def stop(self, server):
+    log('Stopping Server ( %s, %s )' % (server.node.name, server.name))
+    if findServerOnNode(self.adminConfig, server.name, server.node.name):
+      serverObjectName = self.adminControl.completeObjectName('type=Server,node=%s,name=%s,*' % (server.node.name, server.name))
+      if len(serverObjectName) > 0:
+        serverState = self.adminControl.getAttribute(serverObjectName, 'state')
+        debug('%s current state is %s' % (server.name, serverState))
+        if serverState == "STARTED":
+          try:
+            self.adminControl.stopServer(server.name, server.node.name)
+            debug('Server %s on node %s stopped successfully.' % (server.name, server.node.name))
+          except:
+            raiseError('Caught Exception stopping server %s -  %s' % (server.name, formatExceptionInfo()))
+      else:
+        debug('Warn: Server %s is already stopped on node %s' % (server.name, server.node.name))
+    else:
+      debug('Warn: Server %s on Node %s does not exist.' % (server.name, server.node.name))
+   
+  def stopAll(self, servers):
+    for server in servers:
+      self.stop(server)
+  
+model/resource
+
+__init__.py
+
+
+class ResourceOwner:
+  def __init__(self, scope, **config):
+    self.scope = scope
+    self.dataSources = config.get('dataSources', [])
+    self.j2cConnectionFactories = config.get('j2cConnectionFactories', [])
+    self.mqConnectionFactories = config.get('mqConnectionFactories', [])
+    self.mqQueues = config.get('mqQueues', [])
+    self.mqTopics = config.get('mqTopics', [])
+    self.mqActivationSpecs = config.get('mqActivationSpecs', [])
+    self.urls = config.get('urls', [])
+    self.nameSpaceBindings = config.get('nameSpaceBindings', [])
+    self.resourceEnvironmentProviders = config.get('resourceEnvironmentProviders', [])
+    self.workManagers = config.get('workManagers', [])
+    self.objectCacheInstances = config.get('objectCacheInstances', [])
+
+class AuthenticationAlias:
+  def __init__(self, cell, name, user, password, description=''):
+    self.cell = cell
+    self.name = '%s/%s' % (cell.name, name)
+    self.user = user
+    self.password = password
+    self.description = description
+    
+
+class ConnectionPool:
+  def __init__(self, minConnections=0, maxConnections=10, **config):
+    self.minConnections = minConnections
+    self.maxConnections = maxConnections
+    self.connectionTimeout = config.get('connectionTimeout', '180')
+    self.reapTime = config.get('reapTime', '180')
+    self.unusedTimeout = config.get('unusedTimeout', '1800')
+    self.agedTimeout = config.get('agedTimeout', '0')
+    self.purgePolicy = config.get('purgePolicy', 'EntirePool')
+
+
+class ResourceEnvironmentProvider:
+  def __init__(self, name, description='', **config):
+    self.name = name
+    self.description = description
+    # list of J2EEResourceProperty objects
+    self.properties = config.get('properties', [])
+
+
+class J2EEResourceProperty:
+  def __init__(self, name, value, description='', **config):
+    self.name = name
+    self.value = value
+    self.description = description
+    self.required = config.get('required', 'false')
+    self.type = config.get('type', 'java.lang.String')
+    
+async.py
+
+class WorkManagerInfo:
+  def __init__(self, name, jndiName, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.description= config.get('description', '%s WorkManager' % (name))
+    self.minThreads=config.get('minThreads', '0')
+    self.maxThreads=config.get('maxThreads', '2')
+    self.threadPriority = config.get('threadPriority', '5')
+    self.numAlarmThreads = config.get('numAlarmThreads', self.maxThreads)
+    self.isGrowable = config.get('isGrowable', 'true')
+    self.workReqQFullAction = config.get('workReqQFullAction', '0')
+    self.serviceNames = config.get('serviceNames', ['security', 'com.ibm.ws.i18n', 'UserWorkArea'])
+    
+cache.py
+
+
+
+class ObjectCache:
+  def __init__(self, name, jndiName, description='', **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.description = description
+    self.category = config.get('category')
+    self.cacheSize = config.get('cacheSize')
+    self.defaultPriority = config.get('defaultPriority')
+    self.enableCacheReplication = config.get('enableCacheReplication')
+    self.replicationType = config.get('replicationType')
+    self.pushFrequency = config.get('pushFrequency')
+    self.enableDiskOffload = config.get('enableDiskOffload')
+    self.diskCacheSizeInGB = config.get('diskCacheSizeInGB')
+    self.diskCacheSizeInEntries = config.get('diskCacheSizeInEntries')
+    self.diskCacheEntrySizeInMB = config.get('diskCacheEntrySizeInMB')  
+    self.diskCacheCleanupFrequency = config.get('diskCacheCleanupFrequency')
+    self.disableDependencyId = config.get('disableDependencyId')
+    self.diskOffloadLocation = config.get('diskOffloadLocation')
+    self.flushToDiskOnStop = config.get('flushToDiskOnStop')
+    self.useListenerContext = config.get('useListenerContext')
+
+    
+datasource.py
+
+from ewad.util import False
+from ewad.model.resource import AuthenticationAlias, ConnectionPool
+
+class DatabaseType:
+  ORACLE = 'Oracle'
+  MSSQL = 'SQL Server'
+  DB2 = 'DB2'
+  USERDEFINED = 'User-defined'
+  
+class ImplementationType:
+  XA = 'XA data source'
+  NON_XA = 'Connection pool data source'
+
+    
+class JdbcProvider:
+  def __init__(self, p1, p2, p3, p4, p5=None, p6=None, p7=None, **config):
+    self.name = p1
+    self.databaseType = p2
+    self.providerType = p3
+    self.implementationType = p4
+    self.classpath = p5
+    self.implementationClassName = p6
+    self.dataStoreHelperClassName = p7
+    self.description = config.get('description', p3)
+  
+class MsSqlProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'MS SQLServer JDBC'),
+      config.get('databaseType', DatabaseType.MSSQL),
+      config.get('providerType', 'Microsoft SQL Server JDBC Driver'),
+      config.get('implementationType', ImplementationType.NON_XA),
+      config.get('classpath', '${MICROSOFT_JDBC_DRIVER_PATH}/sqljdbc4.jar'),
+      config.get('implementationClassName', 'com.microsoft.sqlserver.jdbc.SQLServerConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.MicrosoftSQLServerDataStoreHelper'),
+      **config)
+      
+class MsSqlProviderPriorVersion(MsSqlProvider):
+  def __init__(self, **config):
+     JdbcProvider.__init__(self,
+      config.get('name', 'MS SQLServer JDBC'),
+      config.get('databaseType', DatabaseType.MSSQL),
+      config.get('providerType', 'Microsoft SQL Server JDBC Driver'),
+      config.get('implementationType', ImplementationType.NON_XA),
+      config.get('classpath', '${MICROSOFT_JDBC_12_DRIVER_PATH}/sqljdbc.jar'),
+      config.get('implementationClassName', 'com.microsoft.sqlserver.jdbc.SQLServerConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.MicrosoftSQLServerDataStoreHelper'),
+      **config)
+ 
+class MsSqlXaProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'MS SQLServer JDBC (XA)'),
+      config.get('databaseType', DatabaseType.MSSQL),
+      config.get('providerType', 'Microsoft SQL Server JDBC Driver'),
+      config.get('implementationType', ImplementationType.XA),
+      config.get('classpath', '${MICROSOFT_JDBC_DRIVER_PATH}/sqljdbc4.jar'),
+      config.get('implementationClassName', 'com.microsoft.sqlserver.jdbc.SQLServerXADataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.MicrosoftSQLServerDataStoreHelper'),
+      **config)
+      
+class MsSqlXaProviderPriorVersion(MsSqlXaProvider):
+  def __init__(self, **config):
+     JdbcProvider.__init__(self,
+      config.get('name', 'MS SQLServer JDBC (XA)'),
+      config.get('databaseType', DatabaseType.MSSQL),
+      config.get('providerType', 'Microsoft SQL Server JDBC Driver'),
+      config.get('implementationType', ImplementationType.XA),
+      config.get('classpath', '${MICROSOFT_JDBC_12_DRIVER_PATH}/sqljdbc.jar'),
+      config.get('implementationClassName', 'com.microsoft.sqlserver.jdbc.SQLServerXADataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.MicrosoftSQLServerDataStoreHelper'),
+      **config)
+ 
+class Db2Provider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'DB2 Universal JDBC'),
+      config.get('databaseType', DatabaseType.DB2),
+      config.get('providerType', 'DB2 Universal JDBC Driver Provider'),
+      config.get('implementationType', ImplementationType.NON_XA),
+      config.get('classpath', '${DB2UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc.jar;${UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc_license_cu.jar;${DB2UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc_license_cisuz.jar'),
+      config.get('implementationClassName', 'com.ibm.db2.jcc.DB2ConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.DB2UniversalDataStoreHelper'),
+      **config)
+      
+class Db2ProviderPriorVersion(Db2Provider):
+  def __init__(self, **config):
+    Db2Provider.__init__(self, **config)
+
+class Db2XaProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'DB2 Universal JDBC (XA)'),
+      config.get('databaseType', DatabaseType.DB2),
+      config.get('providerType', 'DB2 Universal JDBC Driver Provider'),
+      config.get('implementationType', ImplementationType.XA),      
+      config.get('classpath', '${DB2UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc.jar;${UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc_license_cu.jar;${DB2UNIVERSAL_JDBC_DRIVER_PATH}/db2jcc_license_cisuz.jar'),
+      config.get('implementationClassName', 'com.ibm.db2.jcc.DB2XADataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.DB2UniversalDataStoreHelper'),
+      **config)
+      
+class Db2XaProviderPriorVersion(Db2XaProvider):
+  def __init__(self, **config):
+    Db2XaProvider.__init__(self, **config)
+
+class OracleProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'Oracle JDBC'),
+      config.get('databaseType', DatabaseType.ORACLE),
+      config.get('providerType', 'Oracle JDBC Driver'),
+      config.get('implementationType', ImplementationType.NON_XA),            
+      config.get('classpath', '${ORACLE11_JDBC_DRIVER_PATH}/ojdbc6.jar'),
+      config.get('implementationClassName', 'oracle.jdbc.pool.OracleConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper'),
+      **config)
+
+class OracleProviderPriorVersion(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'Oracle Prior Version JDBC'),
+      config.get('databaseType', DatabaseType.ORACLE),
+      config.get('providerType', 'Oracle JDBC Driver'),
+      config.get('implementationType', ImplementationType.NON_XA),            
+      config.get('classpath', '${ORACLE_JDBC_DRIVER_PATH}/ojdbc14.jar'),
+      config.get('implementationClassName', 'oracle.jdbc.pool.OracleConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.Oracle10gDataStoreHelper'),
+      **config)
+  
+class OracleXaProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'Oracle JDBC (XA)'),
+      config.get('databaseType', DatabaseType.ORACLE),
+      config.get('providerType', 'Oracle JDBC Driver'),
+      config.get('implementationType', ImplementationType.XA),                  
+      config.get('classpath', '${ORACLE11_JDBC_DRIVER_PATH}/ojdbc6.jar'),
+      config.get('implementationClassName', 'oracle.jdbc.xa.client.OracleXADataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.Oracle11gDataStoreHelper'),      
+      **config)  
+
+class OracleXaProviderPriorVersion(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'Oracle Prior Version JDBC (XA)'),
+      config.get('databaseType', DatabaseType.ORACLE),
+      config.get('providerType', 'Oracle JDBC Driver'),
+      config.get('implementationType', ImplementationType.XA),            
+      config.get('classpath', '${ORACLE_JDBC_DRIVER_PATH}/ojdbc14.jar'),
+      config.get('implementationClassName', 'oracle.jdbc.xa.client.OracleXADataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.Oracle10gDataStoreHelper'),
+      **config)
+
+class TeradataProvider(JdbcProvider):
+  def __init__(self, **config):
+    JdbcProvider.__init__(self, 
+      config.get('name', 'Teradata JDBC'),
+      config.get('databaseType', DatabaseType.USERDEFINED),
+      config.get('providerType', 'User-defined JDBC Provider'),
+      config.get('implementationType', ImplementationType.NON_XA),                  
+      config.get('classpath', '${TERADATA_CONFIG_DRIVER_PATH}/terajdbc4.jar;${TERADATA_JDBC_DRIVER_PATH}/tdgssconfig.jar'),
+      config.get('implementationClassName', 'com.teradata.jdbc.TeraConnectionPoolDataSource'),
+      config.get('dataStoreHelperClassName', 'com.ibm.websphere.rsadapter.GenericDataStoreHelper'),      
+      **config)  
+
+class TeradataProviderPriorVersion(TeradataProvider):
+  def __init__(self, **config):
+    TeradataProvider.__init__(self, **config)
+  
+class DataSource:
+  def __init__(self, name, jndiName, provider, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.provider = provider
+    # configureResourceProperties option [['name', 'type', 'value'], ....] for -configureResourceProperties option of AdminTask.createDataSource
+    self.configureResourceProperties = []
+    self.description = config.get('description', '%s DataSource' % name)
+    self.authenticationAlias = config.get('authenticationAlias')
+    self.containerManagedPersistence = config.get('containerManagedPersistence', False)
+    # DataSource attributes
+    self.statementCacheSize = config.get('statementCacheSize', '50')
+    self.manageCacheHandles = config.get('manageCacheHandles', 'false')
+    self.logMissingContext = config.get('logMissingContext', 'true')    
+    # DataSource Custom Properties
+    self.beginTranForVendorAPIs = config.get('beginTranForVendorAPIs', None)
+    self.beginTranForResultSetScrollingAPIs = config.get('beginTranForResultSetScrollingAPIs', None)
+    self.connRetriesDuringDBFailover = config.get('connRetriesDuringDBFailover', None)
+    self.connRetryIntervalDuringDBFailover = config.get('connRetryIntervalDuringDBFailover', None)
+    self.connectionSharing = config.get('connectionSharing', None)
+    self.dbFailOverEnabled = config.get('dbFailOverEnabled', None)
+    self.enableMultithreadedAccessDetection = config.get('enableMultithreadedAccessDetection', None)
+    self.errorDetectionModel = config.get('errorDetectionModel', None)
+    self.jmsOnePhaseOptimization = config.get('jmsOnePhaseOptimization', None)
+    self.loginTimeout = config.get('loginTimeout', None)
+    self.nonTransactionalDataSource = config.get('nonTransactionalDataSource', None)
+    self.preTestSqlString = config.get('preTestSqlString', None)
+    self.userDefinedErrorMap = config.get('userDefinedErrorMap', None)
+    self.validateNewConnection = config.get('validateNewConnection', None)
+    self.validateNewConnectionRetryCount = config.get('validateNewConnectionRetryCount', None)
+    self.validateNewConnectionRetryInterval = config.get('validateNewConnectionRetryInterval', None)
+    self.webSphereDefaultIsolationLevel = config.get('webSphereDefaultIsolationLevel', None)
+    self.syncQueryTimeoutWithTransactionTimeout = config.get('syncQueryTimeoutWithTransactionTimeout', None)
+    # DataSource connectionPool        
+    self.connectionPool = config.get('connectionPool', DataSourceConnectionPool())
+
+class MsSqlDataSource(DataSource):
+  def __init__(self, name, jndiName, **config):
+    DataSource.__init__(self, name, jndiName, config.get('jdbcProvider',MsSqlProvider()), **config)
+    # Required properties to create the DataSource    
+    self.configureResourceProperties.append(['databaseName', 'java.lang.String', config.get('databaseName')])
+    self.configureResourceProperties.append(['serverName', 'java.lang.String', config.get('databaseServer')])
+    self.configureResourceProperties.append(['portNumber', 'java.lang.Integer', config.get('databasePort')])
+    # DataSource Custom Properties
+    self.URL = config.get('URL', None)
+    self.applicationName = config.get('applicationName', None)
+    self.encrypt = config.get('encrypt', None)
+    self.failoverPartner = config.get('failoverPartner', None)
+    self.freeResourcesOnClose =config.get('freeResourcesOnClose', None)
+    self.hostNameInCertificate = config.get('hostNameInCertificate', None)
+    self.instanceName = config.get('instanceName', None)
+    self.integratedSecurity = config.get('integratedSecurity', None)
+    self.lastUpdateCount = config.get('lastUpdateCount', None)
+    self.lockTimeout = config.get('lockTimeout', None)
+    self.nonTransactionalDataSource = config.get('nonTransactionalDataSource', None)
+    self.packetSize = config.get('packetSize', None)
+    self.reauthentication = config.get('reauthentication', None)
+    self.responseBuffering = config.get('responseBuffering', None)
+    self.selectMethod = config.get('selectMethod', 'cursor')
+    self.sendStringParametersAsUnicode = config.get('sendStringParametersAsUnicode',None)
+    self.trustServerCertificate = config.get('trustServerCertificate', None)
+    self.trustStore = config.get('trustStore', None)
+    self.trustStorePassword = config.get('trustStorePassword', None)
+    self.workstationID = config.get('workstationID', None)
+    self.xopenStates = config.get('xopenStaties', None)
+        
+class MsSqlXaDataSource(MsSqlDataSource):
+  def __init__(self, name, jndiName, **config):
+    config['jdbcProvider'] = config.get('jdbcProvider', MsSqlXaProvider())
+    MsSqlDataSource.__init__(self, name, jndiName, **config)
+
+class Db2DataSource(DataSource):
+  def __init__(self, name, jndiName, **config):
+    config['statementCacheSize'] = config.get('statementCacheSize', '10')
+    DataSource.__init__(self, name, jndiName, config.get('jdbcProvider', Db2Provider()), **config)
+    # Required properties to create the DataSource    
+    self.configureResourceProperties.append(['driverType', 'java.lang.Integer', '4'])
+    self.configureResourceProperties.append(['databaseName', 'java.lang.String', config.get('databaseName')])
+    self.configureResourceProperties.append(['serverName', 'java.lang.String', config.get('databaseServer')])
+    self.configureResourceProperties.append(['portNumber', 'java.lang.Integer', config.get('databasePort')])
+    # DataSource Custom Properties
+    self.cliSchema = config.get('cliSchema', None)
+    self.clientAccountingInformation = config.get('clientAccountingInformation', None)
+    self.clientApplicationInformation = config.get('clientApplicationInformation', None)
+    self.clientRerouteAlternatePortNumber = config.get('clientRerouteAlternatePortNumber', None)
+    self.clientRerouteAlternateServerName = config.get('clientRerouteAlternateServerName', None)
+    self.clientRerouteServerListJNDIName = config.get('clientRerouteServerListJNDIName', None)
+    self.clientUser = config.get('clientUser', None)
+    self.clientWorkstation = config.get('clientWorkstation', None)
+    self.currentFunctionPath = config.get('currentFunctionPath', None)
+    self.currentPackagePath = config.get('currentPackagePath', None)
+    self.currentPackageSet = config.get('currentPackageSet', None)
+    self.currentSQLID = config.get('currentSQLID', None)
+    self.currentSchema = config.get('currentSchema', None)
+    self.cursorSensitivity = config.get('cursorSensitivity', None)
+    self.deferPrepares = config.get('deferPrepares', None)
+    self.enableClientAffinitiesList = config.get('enableClientAffinitiesList', None)
+    self.fullyMaterializeLobData = config.get('fullyMaterializeLobData', None)
+    self.keepDynamic = config.get('keepDynamic', None)
+    self.kerberosServerPrincipal = config.get('kerberosServerPrincipal', None)
+    self.maxRetriesForClientReroute = config.get('maxRetriesForClientReroute', None)
+    self.propagateClientIdentityUsingTrustedContext = config.get('propagateClientIdentityUsingTrustedContext', None)
+    self.readOnly = config.get('readOnly', None)
+    self.reauthentication = config.get('reauthentication', None)
+    self.resultSetHoldability = config.get('resultSetHoldability', None)
+    self.retrieveMessagesFromServerOnGetMessage = config.get('retrieveMessagesFromServerOnGetMessage', None)
+    self.retryIntervalForClientReroute = config.get('retryIntervalForClientReroute', None)
+    self.securityMechanism = config.get('securityMechanism', None)
+    self.traceDirectory = config.get('traceDirectory', None)
+    self.traceFile = config.get('traceFile', None)
+    self.traceFileAppend = config.get('traceFileAppend', None)
+    self.traceLevel = config.get('traceLevel', None)
+    self.unbindClientRerouteListFromJndi = config.get('unbindClientRerouteListFromJndi', None)
+    self.useTransactionRedirect = config.get('useTransactionRedirect', None)
+    
+  
+class Db2XaDataSource(Db2DataSource):
+  def __init__(self, name, jndiName, **config):
+    config['jdbcProvider'] = config.get('jdbcProvider', Db2XaProvider())
+    Db2DataSource.__init__(self, name, jndiName, **config)
+
+class OracleDataSource(DataSource):
+  def __init__(self, name, jndiName, **config):
+    DataSource.__init__(self, name, jndiName, config.get('jdbcProvider',OracleProvider()), **config)
+    # Required properties to create the DataSource    
+    self.configureResourceProperties.append(['URL', 'java.lang.String', config.get('URL')])    
+    # DataSource Custom Properties
+    self.TNSEntryName = config.get('TNSEntryName', None)
+    self.dataSourceName = config.get('dataSourceName', None)
+    self.databaseName = config.get('databaseName', None)
+    self.driverType = config.get('driverType', None)
+    self.networkProtocol = config.get('networkProtocol', None)
+    self.oracleLogFileCount = config.get('oracleLogFileCount', None)
+    self.oracleLogFileName = config.get('oracleLogFileName', None)
+    self.oracleLogFileSizeLimit = config.get('oracleLogFileSizeLimit', None)
+    self.oracleLogFormat = config.get('oracleLogFormat', None)
+    self.oracleLogPackageName = config.get('oracleLogPackageName', None)
+    self.oracleLogTraceLevel = config.get('oracleLogTraceLevel', None)
+    self.portNumber = config.get('portNumber', None)
+    self.serverName = config.get('serverName', None)
+      
+class OracleXaDataSource(OracleDataSource):
+  def __init__(self, name, jndiName, **config):
+    config['jdbcProvider'] = config.get('jdbcProvider', OracleXaProvider())
+    OracleDataSource.__init__(self, name, jndiName, **config)
+    
+class TeradataDataSource(DataSource):
+  def __init__(self, name, jndiName, **config):
+      DataSource.__init__(self, name, jndiName, config.get('jdbcProvider', TeradataProvider()), **config)
+      self.configureResourceProperties = None
+      # UserDefinedDataSource properties that will be ADDED
+      self.properties = [['DSName', 'java.lang.String', config.get('DSName', ' ')]]
+        
+class DataSourceConnectionPool(ConnectionPool):
+  def __init__(self, minConnections=0, maxConnections=10, **config):
+    ConnectionPool.__init__(self, minConnections, maxConnections, **config)
+    self.preTestConnection = config.get('preTestConnection', 'false')
+    self.preTestConnectionInterval = config.get('preTestConnectionInterval', '0')
+    
+
+jca.py
+
+from ewad.util import False
+from ewad.model.resource import AuthenticationAlias, ConnectionPool
+
+class J2CResourceAdapter:
+  def __init__(self, rarName, rarPath, **config):
+    self.name = rarName
+    self.archivePath = rarPath
+    self.archiveFile = config.get('archiveFile')
+    self.classpath = config.get('classpath', rarPath)
+    self.description = config.get('description', rarName)
+    self.hACapability = config.get('hACapability', 'RA_NO_HA')
+    self.isEnableHASupport = config.get('isEnableHASupport', 'false')
+    self.singleton = config.get('singleton', 'false')    
+    self.isolatedClassLoader = config.get('isolatedClassLoader', 'false')    
+ 
+class IMSResourceAdapter(J2CResourceAdapter):
+  def __init__(self, **config):
+    J2CResourceAdapter.__init__(self, 
+      config.get('name', 'IMS TM Resource Adapter'),
+      config.get('archivePath', '${CONNECTOR_INSTALL_ROOT}/imsico1121.rar'),
+      **config)
+    self.adapterID = config.get('adapterID', None)
+    self.enableHASupport = config.get('enableHASupport', None)
+    self.hideConfidentialTrace = config.get('hideConfidentialTrace', None)
+    self.logFileSize = config.get('logFileSize', None)
+    self.logFileName = config.get('logFileName', None)
+    self.logNumberOfFiles = config.get('logNumberOfFiles', None)
+    self.threadContextPropagationRequired = config.get('threadContextPropagationRequired', None)
+    self.traceFileSize = config.get('traceFileSize', None)
+    self.traceFileName = config.get('traceFileName', None)
+    self.traceNumberOfFiles = config.get('traceNumberOfFiles', None)
+
+class MQResourceAdapter(J2CResourceAdapter):
+  def __init__(self, **config):
+    J2CResourceAdapter.__init__(self, 'WebSphere MQ Resource Adapter', '${WAS_INSTALL_ROOT}/installedConnectors/wmq.jmsra.rar', **config)
+    self.connectionConcurrency = config.get('connectionConcurrency')
+    self.maxConnections = config.get('maxConnections')
+    self.logWriterEnabled  = config.get('logWriterEnabled')
+    self.reconnectionRetryCount  = config.get('reconnectionRetryCount', 5760)
+    self.reconnectionRetryInterval  = config.get('reconnectionRetryInterval', 15000)
+    self.traceEnabled  = config.get('traceEnabled')
+    self.traceLevel  = config.get('traceLevel')
+  
+class J2CConnectionFactory:
+  def __init__(self, name, jndiName, cfResourceClass, cfResourceAdapter, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.resourceAdapter = cfResourceAdapter
+    self.resourceClass = cfResourceClass
+    self.authMechanismPreference = config.get('authMechanismPreference', 'BASIC_PASSWORD')
+    self.authenticationAlias = config.get('authenticationAlias')
+    self.connectionPool = config.get('connectionPool', J2CConnectionPool())
+    self.description = config.get('description', '%s J2CConnectionFactory' % name)
+
+class IMSConnectionFactory(J2CConnectionFactory):
+  def __init__(self, name, jndiName, **config):
+    J2CConnectionFactory.__init__(self,
+        name,
+        jndiName,
+        config.get('resourceClass', 'javax.resource.cci.ConnectionFactory'),   
+        config.get('resourceAdapter', IMSResourceAdapter()), **config)
+    self.CM0Dedicated = config.get('CM0Dedicated', None)
+    self.DataStoreName = config.get('DataStoreName', None) 
+    self.GroupName = config.get('GroupName', None)
+    self.HostName = config.get('HostName', None)
+    self.PortNumber = config.get('PortNumber', None)
+    self.TraceLevel = config.get('TraceLevel', None)
+    self.IMSConnectName = config.get('IMSConnectName', None)
+  
+class J2CConnectionPool(ConnectionPool):
+  def __init__(self, minConnections=0, maxConnections=10, **config):
+    ConnectionPool.__init__(self, minConnections, maxConnections, **config)
+    self.testConnection = config.get('testConnection', 'false')
+    self.testConnectionInterval = config.get('testConnectionInterval', '0')
+  
+  
+ jms.py
+ 
+ from ewad.model.resource import AuthenticationAlias, ConnectionPool
+from ewad.model.resource.jca import MQResourceAdapter
+
+class JmsConnectionFactory:
+  def __init__(self, name, jndiName, description='', **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.description = description
+    self.authenticationAlias = config.get('authenticationAlias')
+    
+class MqConnectionFactory(JmsConnectionFactory):
+  
+  def __init__(self, name, jndiName, queueManagerName, queueManagerHost, queueManagerPort, channel, description='', **config):
+    JmsConnectionFactory.__init__(self, name, jndiName, description, **config)
+    self.queueManagerName = queueManagerName
+    self.queueManagerHost = queueManagerHost
+    self.queueManagerPort = queueManagerPort
+    self.channel = channel
+    self.description = description
+    self.connectionPool = config.get('connectionPool', JmsConnectionPool())
+    self.sessionPool = config.get('sessionPool')
+    self.type = config.get('type', 'MQQueueConnectionFactory')
+
+    # MQConnectionFactory attributes
+    self.CCSID = config.get('CCSID')
+    self.XAEnabled = config.get('enableXa', 'false')    
+    self.authMechanismPreference = config.get('authMechanismPreference')
+    self.brokerCCSubQ = config.get('brokerCCSubQ')
+    self.brokerControlQueue = config.get('brokerControlQueue')
+    self.brokerPubQueue = config.get('brokerPubQueue')
+    self.brokerQueueManager = config.get('brokerQueueManager')
+    self.brokerSubQueue = config.get('brokerSubQueue')
+    self.brokerVersion = config.get('brokerVersion')
+    self.category = config.get('category')
+    self.ccdtUrl = config.get('ccdtUrl')
+    self.clientID = config.get('clientID')
+    self.cloneSupport = config.get('cloneSupport')
+    self.compressHeaders = config.get('compressHeaders')
+    self.compressPayload = config.get('compressPayload')
+    self.diagnoseConnectionUsage = config.get('diagnoseConnectionUsage')
+    self.directAuth = config.get('directAuth')
+    self.failIfQuiesce = config.get('failIfQuiesce', 'true')
+    self.localAddress = config.get('localAddress')
+    self.logMissingTransactionContext = config.get('logMissingTransactionContext')
+    self.manageCachedHandles = config.get('manageCachedHandles')
+    self.maxBatchSize = config.get('maxBatchSize')
+    self.msgRetention = config.get('msgRetention')
+    self.msgSelection = config.get('msgSelection')
+    self.multicast = config.get('multicast')
+    self.pollingInterval = config.get('pollingInterval')
+    self.pubSubCleanup = config.get('pubSubCleanup')
+    self.pubSubCleanupInterval = config.get('pubSubCleanupInterval')
+    self.publishAckInterval = config.get('publishAckInterval')
+    self.rcvExit = config.get('rcvExit')
+    self.rcvExitInitData = config.get('rcvExitInitData')
+    self.replyWithRFH2 = config.get('replyWithRFH2')
+    self.rescanInterval = config.get('rescanInterval')
+    self.secExit = config.get('secExit')
+    self.secExitInitData = config.get('secExitInitData')
+    self.sendExit = config.get('sendExit')
+    self.sendExitInitData = config.get('sendExitInitData')
+    self.sparseSubscriptions = config.get('sparseSubscriptions')
+    self.sslCRL = config.get('sslCRL')
+    self.sslCipherSuite = config.get('sslCipherSuite')
+    self.sslConfiguration = config.get('sslConfiguration')
+    self.sslPeerName = config.get('sslPeerName')
+    self.sslResetCount = config.get('sslResetCount')
+    self.sslType = config.get('sslType')
+    self.statRefreshInterval = config.get('statRefreshInterval')
+    self.substore = config.get('substore')
+    self.tempModel = config.get('tempModel')
+    self.tempQueuePrefix = config.get('tempQueuePrefix')
+    self.tempTopicPrefix = config.get('tempTopicPrefix')
+    self.transportType = config.get('transportType', 'CLIENT')
+    self.useConnectionPooling = config.get('useConnectionPooling')
+    self.wildcardFormat = config.get('wildcardFormat')
+
+    
+class JmsConnectionPool(ConnectionPool):
+  def __init__(self, minConnections=0, maxConnections=10, **config):
+    config['purgePolicy'] = config.get('purgePolicy', 'FailingConnectionOnly')
+    ConnectionPool.__init__(self, minConnections, maxConnections, **config)
+    self.sharedPartitions = config.get('sharedPartitions', '0')
+    self.freePoolPartitions = config.get('freePoolPartitions', '0')
+    self.freePoolTableSize = config.get('freePoolTableSize', '0')
+    self.surgeThreshhold = config.get('surgeThreshhold', '-1')
+    self.surgeInterval = config.get('surgeInterval', '0')
+    self.stuckTimer = config.get('stuckTimer', '0')
+    self.stuckTime = config.get('stuckTime', '0')
+    self.stuckThreshold = config.get('stuckThreshold', '0')
+
+class JmsDestination:
+  def __init__(self, name, jndiName, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.description = config.get('description', '')
+      
+class MqQueue(JmsDestination):
+  def __init__(self, name, jndiName, baseQueueName, **config):
+    JmsDestination.__init__(self, name, jndiName, **config)
+    self.CCSID = config.get('CCSID')
+    self.baseQueueManagerName = config.get('baseQueueManagerName')
+    self.baseQueueName = baseQueueName
+    self.category = config.get('category')
+    self.decimalEncoding = config.get('decimalEncoding')
+    self.expiry = config.get('expiry') 
+    self.floatingPointEncoding = config.get('floatingPointEncoding')
+    self.integerEncoding = config.get('integerEncoding')
+    self.persistence = config.get('persistence') 
+    self.priority = config.get('priority')
+    self.readAhead = config.get('readAhead')
+    self.readAheadClose = config.get('readAheadClose')
+    self.sendAsync = config.get('sendAsync')
+    self.specifiedExpiry = config.get('specifiedExpiry')
+    self.specifiedPriority = config.get('specifiedPriority')
+    self.targetClient = config.get('targetClient')
+    self.useNativeEncoding = config.get('useNativeEncoding')
+    self.messageBody = config.get('messageBody')   
+
+class MqTopic(JmsDestination):
+  def __init__(self, name, jndiName, baseTopicName, **config):
+    JmsDestination.__init__(self, name, jndiName, **config)
+    self.CCSID = config.get('CCSID')
+    self.baseTopicName = baseTopicName
+    self.brokerCCDurSubQueue = config.get('brokerCCDurSubQueue')
+    self.brokerDurSubQueue = config.get('brokerDurSubQueue')
+    self.brokerPubQmgr = config.get('brokerPubQmgr')
+    self.brokerPubQueue = config.get('brokerPubQueue')
+    self.brokerVersion = config.get('brokerVersion')
+    self.category = config.get('category')
+    self.decimalEncoding = config.get('decimalEncoding')
+    self.expiry = config.get('expiry')
+    self.floatingPointEncoding = config.get('floatingPointEncoding')
+    self.integerEncoding = config.get('integerEncoding')
+    self.multicast = config.get('multicast')
+    self.persistence = config.get('persistence')
+    self.priority = config.get('priority')
+    self.readAhead = config.get('readAhead')
+    self.readAheadClose = config.get('readAheadClose')
+    self.sendAsync = config.get('sendAsync')
+    self.specifiedExpiry = config.get('specifiedExpiry')
+    self.specifiedPriority = config.get('specifiedPriority')
+    self.targetClient = config.get('targetClient')
+    self.useNativeEncoding = config.get('useNativeEncoding')
+    self.wildcardFormat = config.get('wildcardFormat')
+
+class ListenerPort:
+  def __init__(self, name, connectionFactoryJndi, destinationJndi, **config):
+    self.name = name
+    self.connectionFactoryJndi = connectionFactoryJndi
+    self.destinationJndi = destinationJndi
+    self.description = config.get('description', '')
+    self.maxSessions = config.get('maxSessions', '5')
+    self.maxRetries = config.get('maxRetries', '0')
+    self.maxMessages = config.get('maxMessages', '1')
+    self.initialState = config.get('initialState', 'START')
+
+class JmsActivationSpec:
+  def __init__(self, name, jndiName, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.description = config.get('description', '')
+    self.jmsDestination = config.get('destination', '')
+    self.jmsDestinationType = config.get('destinationType', 'javax.jms.Queue')
+    
+class MQActivationSpec(JmsActivationSpec):
+  def __init__(self, name, jndiName, connectionFactory, **config):
+    JmsActivationSpec.__init__(self, name, jndiName, **config)
+    self.resourceAdapter = config.get('resourceAdapter', MQResourceAdapter())
+    self.connectionFactory = connectionFactory
+    self.cloneSupport = config.get('cloneSupport')
+    self.maxPoolDepth = config.get('maxPoolDepth', 1)
+    self.messageSelector = config.get('messageSelector')
+    self.subscriptionDurability = config.get('subscriptionDurability')
+    self.subscriptionName = config.get('subscriptionName')
+    self.clientID = config.get('clientID', self.connectionFactory.clientID)
+    self.arbitraryProperties = config.get('arbitraryProperties', 'was_stopEndpointIfDeliveryFails="true",was_failureDeliveryCount="3",sslType="NONE",sslConfiguration=""')
+
+	
+url.py
+
+
+class Url:
+  def __init__(self, name, jndiName, url, **config):
+    self.name = name
+    self.jndiName = jndiName
+    self.url = url
+    
+
+model/
+
+__init__.py
+
+na
+
+application.py
+
+
+
+class Application:
+  '''
+    WebSphere Application
+  '''
+  
+  def __init__(self, name, target, **config):
+    self.name = name
+    self.target = target
+    self.classloaderMode = config.get('classloaderMode', 'PARENT_FIRST')
+    self.classloaderPolicy = config.get('classloaderPolicy', 'SINGLE')
+    self.virtualHost = config.get('virtualHost', 'default_host')
+    self.sessionManager = config.get('sessionManager', SessionManager())
+    self.roleMappings = config.get('roleMappings', [])
+    self.sharedLibraries = config.get('sharedLibraries', [])
+    self.jsfProvider = config.get('jsfProvider', '')
+
+class EarApplication(Application):
+  '''
+    WebSphere Ear Application
+  '''
+  
+  def __init__(self, name, target, ear, **config):
+    Application.__init__(self, name, target, **config)
+    self.ear = ear
+    self.modules = config.get('modules', [])
+
+class blackBoxApplication(Application):
+  '''
+    WebSphere Ear Application
+  '''
+  
+  def __init__(self, name, target, ear, **config):
+    Application.__init__(self, name, target, **config)
+    self.ear = ear
+    self.modules = config.get('modules', [])
+
+class WarApplication(Application):
+  '''
+    WebSphere War Application
+  '''
+  
+  def __init__(self, name, target, war, **config):
+    Application.__init__(self, name, target, **config)
+    self.war = war
+
+
+class Module:
+  def __init__(self, name, uri, **config):
+    self.name = name
+    self.uri = uri
+
+class WebModule(Module):
+  def __init__(self, name, uri, **config):
+    Module.__init__(self, name, uri, **config)
+    self.classloaderMode = config.get('classloaderMode', 'PARENT_FIRST')
+    self.virtualHost = config.get('virtualHost', 'default_host')
+    self.sessionManager = config.get('sessionManager', SessionManager())
+   
+class SessionManager:
+  def __init__(self, **config):
+    self.enable = config.get('enable', 'false')
+    self.enableCookies = config.get('enableCookies', 'true')
+    self.cookieName = config.get('cookieName', 'JSESSIONID')
+    self.maxWaitTime = config.get('maxWaitTime', '0')
+    self.cookieMaxAge = config.get('cookieMaxAge', '-1')
+    self.invalidationTimeout = config.get('invalidationTimeout', '30')
+    self.maxInMemorySessionCount = config.get('maxInMemorySessionCount', '1000')
+
+class EjbModule(Module):
+  def __init__(self, name, uri, **config):
+    Module.__init__(self, name, uri, **config)
+
+class RoleMapping:
+  def __init__(self, name, users=[], groups=[], **config):
+    self.name = name
+    self.everyone = config.get('everyone', 'No')
+    self.allAuthenticated = config.get('allAuthenticated', 'No')
+    self.users = '|'.join(users)
+    self.groups = '|'.join(groups)
+
+env.py
+
+
+from ewad.util import False, True
+
+class Scope:
+  '''
+    Defines a config scope
+  ''' 
+  CELL = 'Cell'
+  NODE = 'Node'
+  CLUSTER = 'Cluster'
+  SERVER = 'Server'
+  
+  def __init__(self, type, name, node=None):
+    self.type = type
+    self.name = name
+    self.node = node
+  
+  def __str__(self):
+    if self.node:
+      name = '%s:%s' % (self.node.name, self.name)
+    else:
+      name = self.name
+    return '%s: %s' % (self.type, name)
+    
+
+class Cell:
+  '''
+    WebSphere Cell
+  '''
+  
+  def __init__(self, name):
+    self.name = name
+    self.scope = Scope(Scope.CELL, name)
+
+class CoreGroup:
+  def __init__(self, name, **config):
+    self.name = name
+    self.customproperties = config.get('customproperties', [['IBM_CS_DATASTACK_MEG', '100'],['IBM_CS_WIRE_FORMAT_VERSION', '6.1.0']])
+
+class NameSpaceBinding:
+  def __init__(self, name, value):
+    self.name = name
+    self.value = value
+
+class Node:
+  '''
+  WebSphere Node
+  '''  
+  def __init__(self, name):
+    self.name = name
+    self.scope = Scope(Scope.NODE, name)
+
+class SecurityDomain:
+  def __init__(self, name, description, addMembers=False):
+    self.name = name
+    self.description = description
+    self.addMembers = addMembers
+    
+class SharedLibrary:
+  def __init__(self, owner, name, classpath):
+    self.owner = owner
+    self.name = name
+    self.classpath = classpath
+      
+server.py
+
+from ewad.util import True, False
+from ewad.model.env import Node, Scope, Cell
+from ewad.model.resource import ResourceOwner
+  
+class ApplicationServer(ResourceOwner):
+  def __init__(self, cell, node, name, portSeed, **config):
+    self.name = name
+    self.cell = cell
+    self.node = node
+    self.portSeed = portSeed
+    self.recreate = config.get('recreate', False)
+    self.initialState = config.get('initialState', InitialState.Started)
+    self.classloadingMode = config.get('classloadingMode', 'PARENT_FIRST')
+    self.classloadingPolicy = config.get('classloadingPolicy', 'MULTIPLE')
+    self.javaVirtualMachine = config.get('javaVirtualMachine', JavaVirtualMachine())
+    self.sessionManager = config.get('sessionManager', SessionManager())
+    self.webContainer = config.get('webContainer', WebContainer())
+    self.ejbContainer = config.get('ejbContainer', EjbContainer())
+    self.objectRequestBroker = config.get('objectRequestBroker', ObjectRequestBroker())
+    self.transactionService = config.get('transactionService')
+    self.haManager = config.get('haManager', HaManager())
+    self.systemOutConfig = config.get('systemOutConfig', LoggingConfig('outputStreamRedirect'))
+    self.systemErrConfig = config.get('systemErrConfig', LoggingConfig('errorStreamRedirect'))
+    self.defaultThreadPool = config.get('defaultThreadPool', ThreadPool('Default', threadPoolMin='5', threadPoolMax='20'))
+    self.listenerPorts = config.get('listenerPorts', [])
+    self.traces = config.get('traces', [])
+    self.hostNameIncludeList = config.get('hostNameIncludeList', [])
+    self.environment = config.get('environment', [])
+    
+    ResourceOwner.__init__(self, Scope(Scope.SERVER, name, node), **config)
+
+class Cluster(ResourceOwner):
+  def __init__(self, cell, clusterName, members=[], preferLocal=True, replication=False, **config):
+    self.cell = cell
+    self.name = clusterName
+    self.preferLocal = preferLocal
+    self.replication = replication
+    self.members = members
+    self.recreate = config.get('recreate', False)    
+    ResourceOwner.__init__(self, Scope(Scope.CLUSTER, clusterName), **config)
+
+class ClusterMember(ApplicationServer):
+  cluster = None
+
+  def __init__(self, cell, node, name, portSeed, **config):
+    ApplicationServer.__init__(self, cell, node, name, portSeed, **config)
+    self.nodeWeight = config.get('nodeWeight', 2)
+
+
+class JavaVirtualMachine:
+  def __init__(self, **config):
+    self.minHeap = config.get('minHeap', 128);
+    self.maxHeap = config.get('maxHeap', 256);
+    self.jvmArguments = config.get('jvmArguments', '')
+    self.debugArguments = config.get('debugArguments', '')
+    self.jvmDebugMode = config.get('jvmDebugMode', 'false')
+    self.verboseGC = config.get('verboseGC', 'false')
+    self.environment = config.get('environment', [])
+    self.systemProperties = config.get('systemProperties', [])
+    self.classpath = config.get('classpath', '')  
+  
+class HaManager:
+  def __init__(self, **config):
+    self.enabled = config.get('enabled', 'false')
+    self.coreGroup = config.get('coreGroup', 'NonHACoreGroup')
+    self.transportBufferSize = config.get('transportBufferSize', '100')
+    self.threadPool = config.get('threadPool', ThreadPool('HAManagerService.Pool', threadPoolMin='2', threadPoolMax='6', threadPoolGrowable='true'))
+    
+class SessionManager:
+  def __init__(self, **config):
+    self.enable = config.get('enable', 'false')
+    self.enableCookies = config.get('enableCookies', 'true')
+    self.sessionTrackingOption = config.get('sessionTrackingOption', 'COOKIE')
+    self.cookieName = config.get('cookieName', 'JSESSIONID')
+    self.maxWaitTime = config.get('maxWaitTime', '0')
+    self.cookieMaxAge = config.get('cookieMaxAge', '-1')
+    self.invalidationTimeout = config.get('invalidationTimeout', '30')
+    self.maxInMemorySessionCount = config.get('maxInMemorySessionCount', '1000')
+
+class WebContainer:
+  def __init__(self, **config):
+    #self.initialState = config.get('initialState', InitialState.Started)
+    #self.enableServletCaching = config.get('enableServletCaching', 'false')
+    #self.threadPool = config.get('threadPool', ThreadPool('WebContainer'))
+    #self.sessionTimeout = config.get('sessionTimeout', '30')
+    self.properties = config.get('properties', [])
+
+class EjbContainer:
+  def __init__(self, **config):
+    self.initialState = config.get('initialState', InitialState.Started)
+  
+class ObjectRequestBroker:
+  def __init__(self, **config):
+    self.noLocalCopies = config.get('noLocalCopies', 'false')
+    self.requestTimeout = config.get('requestTimeout','180')
+    self.threadPool = config.get('threadPool', ThreadPool('ORB.thread.pool'))
+
+class ThreadPool:
+  def __init__(self, name, **config):
+    self.name = name
+    self.threadPoolMin = config.get('threadPoolMin', '10')
+    self.threadPoolMax = config.get('threadPoolMax', '50')
+    self.threadPoolGrowable = config.get('threadPoolGrowable', 'false')  
+  
+class TransactionService:
+  def __init__(self, **config):
+    self.totalTranLifetimeTimeout = config.get('totalTranLifetimeTimeout')
+    self.propogatedOrBMTTranLifetimeTimeout = config.get('propogatedOrBMTTranLifetimeTimeout')
+    self.clientInactivityTimeout = config.get('clientInactivityTimeout')
+    self.transactionLogDirectory = config.get('transactionLogDirectory')
+  
+class LoggingConfig:
+  def __init__(self, name, **config):
+    self.redirectName = name
+    self.rolloverSize = config.get('rolloverSize', '5')
+    self.maxBackups = config.get('maxBackups', '5')
+
+
+class Trace:
+  def __init__(self, **config):
+    self.enable = config.get('enable', 'true')
+    self.startupTraceSpecification = config.get('startupTraceSpecification', '*.')
+    self.traceLevel = config.get('traceLevel','info')
+
+class InitialState:
+  Started = 'START'
+  Stopped = 'STOP'
+  
+    
+virtualhost.py
+
+from ewad.model.env import Cell
+
+class VirtualHost:
+  def __init__(self, cell, name, aliases=[]):
+    self.cell = cell
+    self.name = name
+    self.aliases = aliases
+    
+
+class Alias:
+  def __init__(self, host, port):
+    self.hostname = host
+    self.port = port
+
+	
+
 Shell Script to list the name of files in a certain path ?
 #!/bin/sh
 for i in `ls -lar *.*`
