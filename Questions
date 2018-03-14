@@ -290,5 +290,29 @@ erb is the extension of the template engine used to interpret the file. ... er
 
 
 
+Ansible Vault ?
+ansible-playbook site.yml --ask-vault-pass
+From <http://docs.ansible.com/ansible/latest/playbooks_vault.html> 
+ansible-playbook site.yml --vault-password-file ~/.vault_pass.txt
+ansible-playbook site.yml --vault-password-file ~/.vault_pass.py
+
+How to list the variables in Ansible ?
+How to fetch the environment variables in Ansible ?
+Difference between Ansible and Chef ?
+How Ansible used for Provisioning ?
+Difference between List and Tuple ?
+How Multithreading inherited in Python ?
+Key features of Python ?
+How Auto Scaling works in AWS ?
+What you have implemented in AWS Lambda ?
+Which is most recent script you worked upon ?
+Git stash command ?
+Git list the commit changes  ?
+Git revert the changes ?
+Git difference command ?
+Difference between Git and SVN ?
+Difference between Pull and Push in GIT ?
+
+
 
 
