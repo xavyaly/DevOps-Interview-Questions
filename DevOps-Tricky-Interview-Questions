@@ -1,10 +1,4 @@
-Key Responsibilities In DevOps:
-
-CI CD Pipelines
-Automations: PowerShell, Python, Shell Scripting
-AWS Services: EC2, Fargate, VPC, ELB, AS, 
-CF Stack Creation post push in S3
-Monitoring: Kibana
+Basic defination of CI CD:
 
 CI: Continuous Integration
 It’s a part of both Continuous Delivery & Continuous Deployment, involves the testing and building of any new or updated source code.
@@ -15,45 +9,15 @@ Involves a manual trigger to Production
 CD: Continuous Deployment
 Involves an Automatic Release to Production
 
-Implement and support EC2, VPC, ELB, Cloud Formation, S3, CLI, IAM Roles, Cloud Watch, Key Pair, VPC Peering, SNS, SQS, AMI, Auto Scaling, Route53, Snapshots, Security Groups, NAT Server, IG, VPN, VPG, NACL etc.
+————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
-Hands on experience in Orchestration, Migration, Disaster Recovery.
-
-Experience on handling Docker Container, Domain Registration, Web Application, Network File System, Storing Files, MySQL Continuous Deployment Pipeline.
-
-Research, troubleshoot, develop and implement a workaround (if needed). 
-
-Experience on Alert, Monitoring, History, File System, I/O wait with ELK.
-
-Experience in installing and administering tools: CI tools like Jenkins, GIT, Nexus, CQ-5, TIBCO, Stash, Jenkins, CMS Servers (Author & Publish), Post Deployment of Certificates (CMS, WEB, WCS, IAM, ILAB) and TIBCO, WILLY, BOOMI, Load Generators, Load Runners, IP Tables, BackUp and Recovery, Virtualization, Log Rotation, LVM, YUM, DNS, File Permissions, Managing Process, Linux File System, Package Management.
-
-Supporting to build, release and configure changes into the Dev testing, QA and Staging environment as well as coordinating releasing of approved changes into the Production environment.
-
-Experience on AWS CLI to configure services 
-
-Experience on Ansible Playbook, Shell Scripting, PowerShell, Python scripts, JSON Template.
-
-Experience on DR Cloud backup, Restoration processes, SSL, System Performance, Migration.
-
-Manage CF Template to configure AWS Services
-
-Implemented on GIT Branching Model
-
-Work closely with the Development/QA/Support teams to ensure efficient release including builds, installs, patch creation, test verification and deployment.
-
-Supported on software configuration management activities including multiple continuous build environments, code repository administration, code packaging and deployments to multiple development, QA and production environments.
-
-Research, troubleshoot, develop and implement a workaround (if needed) and gain agreement from customers on problem resolution.
-
-Excelled in finding, documenting and reporting bugs, errors, issues within proprietary software applications developed for Company’s global user base.
-
-————————————————————————————————————————
-
-Aqua Security:
-
-Q: What Elastic IP is important and why is it used ? Where can we insert in 3-Tier Architecture ?
+Q: Why Elastic IP is important & why is it used ? Where can we insert in 3-Tier Architecture ?
+An Elastic IP address is a reserved public IP address that you can assign to any EC2 instance in a particular region, 
+until you choose to release it. To allocate an Elastic IP address to your account in a particular region
+Link: https://asmed.com/amazon-aws-assign-an-elastic-ip-address-to-your-instance/
 
 Q: What is ElasticSearch ? What have you implemented with ES ?
+
 
 Q: Difference between EKS and ECS ? 
 
